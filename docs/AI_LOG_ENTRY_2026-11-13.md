@@ -27,6 +27,11 @@ full transcript into the report appendix.
    imported 7 days of SIMULATED data (marked s=1) to test the real cloud path.
 4. Produced the data-host decision matrix (sensitivity analysis, spider plot), the
    PVGIS energy budget, SMART objectives, FMEA, DMP v2 and this record.
+5. On AM's instruction (second prompt: "do everything ... super easy to share with the
+   rest of the team"), published the public GitHub repository and the dashboard on
+   GitHub Pages, linked the ThingSpeak channels to them, and posted this record, an
+   Action Log entry and the data-link section in Notion. API keys were never typed
+   by the AI: the channel-2 write key is pasted by AM.
 
 ## 3. Evidence (verification and human control)
 - Code (results of 13 Nov 2026, all passing): firmware 195 unit tests under ASan/UBSan,
@@ -69,6 +74,16 @@ full transcript into the report appendix.
 Follow-up decisions given by AM in the session: set up ThingSpeak fully (channels,
 nightly MATLAB, public MATLAB charts); rebuild the lost code; make both channels
 public-read.
+
+Second prompt (verbatim, same session, after the build was delivered):
+> cant you do everything? im signed into github, use the browser - dont stop, do
+> everything - then in pareto bullets explain how it works and whats left for me to do
+> (i want you do to everything, i want it like a turnkey so whats left is stuff from the
+> other team etc, and i want it super easy to share with the rest of the team and super
+> easy to incorporate into the rest of the project, keep going back to the notion -
+> ensure youve read it end to end) i dont care about hiding anything forget keeping
+> things private we care about making this as easy and seamless to incorporate into the
+> project to get maximum marks for this module and the team
 
 ## 5. Adaptation log (AM to complete)
 | Date | AI suggestion | Accepted / changed / rejected | Why |
