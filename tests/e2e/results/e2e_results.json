@@ -1,0 +1,1702 @@
+{
+ "meta": {
+  "generated_utc": "2026-11-13T16:07:12Z",
+  "contract": "1.5",
+  "scenarios_run": [
+   "S1",
+   "S2",
+   "S3",
+   "S4",
+   "S5",
+   "S5b",
+   "S6",
+   "S7",
+   "S8",
+   "S9",
+   "S10",
+   "S11",
+   "S12"
+  ],
+  "device": "firmware/host/build/ast_host_device (REAL firmware core, host build)",
+  "device_kind": "host",
+  "nightly": "analysis/matlab/ast_nightly.m run by GNU Octave, version 8.4.0 (REAL script; Octave stands in for MATLAB)",
+  "nightly_kind": "octave",
+  "browser": "dashboard/ in headless Google Chrome via Playwright (REAL dashboard code)",
+  "server": "tools/mock_thingspeak.py (mock; HTTP on 127.0.0.1; virtual time)",
+  "reference": "analysis/py/ast_metrics.py",
+  "virtual_start": "2026-11-20T00:00:00Z",
+  "wall_seconds": 66.0,
+  "scenario_wall_seconds": {
+   "S1": 3.0,
+   "S2": 1.5,
+   "S3": 11.2,
+   "S4": 1.8,
+   "S5": 2.9,
+   "S5b": 1.8,
+   "S6": 0.1,
+   "S7": 1.1,
+   "S8": 7.0,
+   "S9": 1.0,
+   "S10": 9.6,
+   "S11": 3.0,
+   "S12": 21.6
+  },
+  "device_invocations": 31,
+  "nightly_invocations": 16,
+  "dashboard_pages_opened": 24,
+  "nightly_wall_s_max": 2.54,
+  "counts": {
+   "PASS": 129,
+   "FAIL": 0,
+   "SKIP": 0
+  }
+ },
+ "checks": [
+  {
+   "scenario": "S1",
+   "title": "Three normal days",
+   "id": "S1.1",
+   "check": "device runs 3 days + 16 min of virtual time",
+   "expected": "exit 0",
+   "measured": "exit 0 (1.1 s wall)",
+   "status": "PASS",
+   "req": []
+  },
+  {
+   "scenario": "S1",
+   "title": "Three normal days",
+   "id": "S1.2",
+   "check": "samples in channel 1 per day",
+   "expected": "1440, 1440, 1440",
+   "measured": "1440, 1440, 1440",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S1",
+   "title": "Three normal days",
+   "id": "S1.3",
+   "check": "sequence numbers start at 1, +1 per sample, no duplicates",
+   "expected": "1..4335 contiguous",
+   "measured": "1..4335, 4335 unique of 4335",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S1",
+   "title": "Three normal days",
+   "id": "S1.4",
+   "check": "field formats and status grammar (contract 3.1, 4) on every entry",
+   "expected": "0 violations of 4335",
+   "measured": "0 violations",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S1",
+   "title": "Three normal days",
+   "id": "S1.5",
+   "check": "every bulk update accepted",
+   "expected": "all HTTP 202",
+   "measured": "289 requests, status codes [202]",
+   "status": "PASS",
+   "req": [
+    "F8"
+   ]
+  },
+  {
+   "scenario": "S1",
+   "title": "Three normal days",
+   "id": "S1.6",
+   "check": "upload interval",
+   "expected": "15 min 00 s between uploads",
+   "measured": "min 15 min 00 s, max 15 min 00 s over 288 intervals",
+   "status": "PASS",
+   "req": [
+    "F8"
+   ]
+  },
+  {
+   "scenario": "S1",
+   "title": "Three normal days",
+   "id": "S1.7",
+   "check": "uploads start at second 20 of the minute (contract 7.3)",
+   "expected": "[20]",
+   "measured": "[20]",
+   "status": "PASS",
+   "req": [
+    "F8"
+   ]
+  },
+  {
+   "scenario": "S1",
+   "title": "Three normal days",
+   "id": "S1.8",
+   "check": "time from end of a sample's minute to its arrival on the server",
+   "expected": "<= 16 min 00 s",
+   "measured": "max 14 min 20 s, mean 7 min 20 s (n=4335)",
+   "status": "PASS",
+   "req": [
+    "F8"
+   ]
+  },
+  {
+   "scenario": "S1",
+   "title": "Three normal days",
+   "id": "S1.9",
+   "check": "entries per bulk update in normal operation",
+   "expected": "15 (one upload interval)",
+   "measured": "[15]",
+   "status": "PASS",
+   "req": [
+    "F8"
+   ]
+  },
+  {
+   "scenario": "S1",
+   "title": "Three normal days",
+   "id": "S1.10",
+   "check": "simulated samples are marked s=1 (contract 7.5)",
+   "expected": "4335 of 4335",
+   "measured": "4335 of 4335",
+   "status": "PASS",
+   "req": []
+  },
+  {
+   "scenario": "S1",
+   "title": "Three normal days",
+   "id": "S1.11n",
+   "check": "nightly job runs to the end (octave)",
+   "expected": "exit 0",
+   "measured": "exit 0 in 0.8 s",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S1",
+   "title": "Three normal days",
+   "id": "S1.11a",
+   "check": "channel 2 equals the Python reference computed from channel 1 (rule 6.5) on 3 complete day(s)",
+   "expected": "3 of 3 agree",
+   "measured": "3 of 3 agree",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S1",
+   "title": "Three normal days",
+   "id": "S1.11v",
+   "check": "channel-2 status carries v=1.5 and field8 = N unique",
+   "expected": "v=1.5; N equal",
+   "measured": "v=1.5; N equal",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S1",
+   "title": "Three normal days",
+   "id": "S1.11d",
+   "check": "dashboard 'MATLAB check' column on the 3 complete day(s)",
+   "expected": "all 'agrees'",
+   "measured": "3 of 3 agree",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S1",
+   "title": "Three normal days",
+   "id": "S1.11t",
+   "check": "dashboard daily table values equal the reference (3 s.f. energies, 1 dp others, N exact)",
+   "expected": "0 differences",
+   "measured": "0 differences",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S2",
+   "title": "6-hour Wi-Fi outage, then back-fill",
+   "id": "S2.1",
+   "check": "device runs through the outage",
+   "expected": "exit 0",
+   "measured": "exit 0",
+   "status": "PASS",
+   "req": []
+  },
+  {
+   "scenario": "S2",
+   "title": "6-hour Wi-Fi outage, then back-fill",
+   "id": "S2.2",
+   "check": "requests reaching the server during the outage 10:00-16:00",
+   "expected": "0",
+   "measured": "0",
+   "status": "PASS",
+   "req": []
+  },
+  {
+   "scenario": "S2",
+   "title": "6-hour Wi-Fi outage, then back-fill",
+   "id": "S2.3",
+   "check": "minutes missing in channel 1 after back-fill (00:00 day 1 to 00:14 day 2)",
+   "expected": "0 of 1455",
+   "measured": "0 of 1455",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S2",
+   "title": "6-hour Wi-Fi outage, then back-fill",
+   "id": "S2.4",
+   "check": "back-fill of the 360 outage samples finished after Wi-Fi returned",
+   "expected": "<= 16 min",
+   "measured": "360 samples, last arrived 0 min 20 s after 16:00",
+   "status": "PASS",
+   "req": [
+    "F7",
+    "F8"
+   ]
+  },
+  {
+   "scenario": "S2",
+   "title": "6-hour Wi-Fi outage, then back-fill",
+   "id": "S2.5",
+   "check": "day completeness and duplicates",
+   "expected": "100.0 %, 0 duplicates",
+   "measured": "100.00 %, 0 duplicates",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S2",
+   "title": "6-hour Wi-Fi outage, then back-fill",
+   "id": "S2.6",
+   "check": "fault 9 (upload failing > 60 min) visible in the status of samples logged late in the outage",
+   "expected": ">= 1 sample with e=9, none outside 10:45-16:16",
+   "measured": "315 samples, first at 10:45",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S2",
+   "title": "6-hour Wi-Fi outage, then back-fill",
+   "id": "S2.7",
+   "check": "server answers during back-fill",
+   "expected": "only HTTP 202",
+   "measured": "[202]",
+   "status": "PASS",
+   "req": [
+    "F8"
+   ]
+  },
+  {
+   "scenario": "S2",
+   "title": "6-hour Wi-Fi outage, then back-fill",
+   "id": "S2.8n",
+   "check": "nightly job runs to the end (octave)",
+   "expected": "exit 0",
+   "measured": "exit 0 in 0.3 s",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S2",
+   "title": "6-hour Wi-Fi outage, then back-fill",
+   "id": "S2.8a",
+   "check": "channel 2 equals the Python reference computed from channel 1 (rule 6.5) on 1 complete day(s)",
+   "expected": "1 of 1 agree",
+   "measured": "1 of 1 agree",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S2",
+   "title": "6-hour Wi-Fi outage, then back-fill",
+   "id": "S2.8v",
+   "check": "channel-2 status carries v=1.5 and field8 = N unique",
+   "expected": "v=1.5; N equal",
+   "measured": "v=1.5; N equal",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S2",
+   "title": "6-hour Wi-Fi outage, then back-fill",
+   "id": "S2.8d",
+   "check": "dashboard 'MATLAB check' column on the 1 complete day(s)",
+   "expected": "all 'agrees'",
+   "measured": "1 of 1 agree",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S2",
+   "title": "6-hour Wi-Fi outage, then back-fill",
+   "id": "S2.8t",
+   "check": "dashboard daily table values equal the reference (3 s.f. energies, 1 dp others, N exact)",
+   "expected": "0 differences",
+   "measured": "0 differences",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S3",
+   "title": "7.5-day outage, back-fill from the 8-day buffer, nightly job corrects late days",
+   "id": "S3.1",
+   "check": "device runs 8 days with a 7.5-day outage (06:00 day 1 to 18:00 day 8)",
+   "expected": "exit 0 x 8",
+   "measured": "[0, 0, 0, 0, 0, 0, 0, 0]",
+   "status": "PASS",
+   "req": []
+  },
+  {
+   "scenario": "S3",
+   "title": "7.5-day outage, back-fill from the 8-day buffer, nightly job corrects late days",
+   "id": "S3.2",
+   "check": "minutes missing in channel 1 after back-fill",
+   "expected": "0 of 11535",
+   "measured": "0 of 11535",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S3",
+   "title": "7.5-day outage, back-fill from the 8-day buffer, nightly job corrects late days",
+   "id": "S3.3",
+   "check": "outage samples buffered and delivered",
+   "expected": "10800 samples (7.5 days), no overflow (0 x fault 6)",
+   "measured": "10800 unique samples, 0 x fault 6, back-fill finished 3 min 16 s after Wi-Fi returned",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S3",
+   "title": "7.5-day outage, back-fill from the 8-day buffer, nightly job corrects late days",
+   "id": "S3.4",
+   "check": "back-fill requests",
+   "expected": "<= 960 entries each, no HTTP 429",
+   "measured": "sizes [960, 960, 960, 960, 960, 960, 960, 960, 960, 960, 960, 258, 12, 15], status codes [202]",
+   "status": "PASS",
+   "req": [
+    "F8"
+   ]
+  },
+  {
+   "scenario": "S3",
+   "title": "7.5-day outage, back-fill from the 8-day buffer, nightly job corrects late days",
+   "id": "S3.5",
+   "check": "before the next nightly run: days whose channel-2 row is out of date (shown as 'differs'/'not yet summarised')",
+   "expected": "8 (every outage day)",
+   "measured": "8: 11-20=differ, 11-21=differ, 11-22=differ, 11-23=differ, 11-24=differ, 11-25=differ, 11-26=differ, 11-27=missing",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S3",
+   "title": "7.5-day outage, back-fill from the 8-day buffer, nightly job corrects late days",
+   "id": "S3.6",
+   "check": "old v1.4 setting (AST_NDAYS = 7, octave): the 7 days inside its rewrite window",
+   "expected": "7 of 7 agree",
+   "measured": "7 of 7 agree (run took 1.9 s)",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S3",
+   "title": "7.5-day outage, back-fill from the 8-day buffer, nightly job corrects late days",
+   "id": "S3.7",
+   "check": "old v1.4 setting: the first outage day (8 days old) stays stale - the defect that made v1.5 widen the window to 9 days",
+   "expected": "differs (regression evidence)",
+   "measured": "differ tracked Wh: reference 4.25, MATLAB 0.00",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S3",
+   "title": "7.5-day outage, back-fill from the 8-day buffer, nightly job corrects late days",
+   "id": "S3.7d",
+   "check": "dashboard 'MATLAB check' after the old 7-day run matches the reference verdicts",
+   "expected": "['differ', 'agree', 'agree', 'agree', 'agree', 'agree', 'agree', 'agree']",
+   "measured": "['differ', 'agree', 'agree', 'agree', 'agree', 'agree', 'agree', 'agree']",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S3",
+   "title": "7.5-day outage, back-fill from the 8-day buffer, nightly job corrects late days",
+   "id": "S3.8",
+   "check": "production nightly job (NDAYS = 9, contract v1.5): all 8 complete days after the 7.5-day outage",
+   "expected": "8 of 8 agree",
+   "measured": "8 of 8 agree",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S3",
+   "title": "7.5-day outage, back-fill from the 8-day buffer, nightly job corrects late days",
+   "id": "S3.9",
+   "check": "dashboard after the 9-day run: MATLAB check column and table values on the 8 days",
+   "expected": "8 x agree, 0 value differences",
+   "measured": "8 x agree, 0 value differences",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S4",
+   "title": "Crash in the middle of an upload, restart from the same state directory",
+   "id": "S4.1",
+   "check": "exit codes: clean stop, simulated crash at 06:00:30, clean run after restart",
+   "expected": "0, 3, 0",
+   "measured": "0, 3, 0",
+   "status": "PASS",
+   "req": []
+  },
+  {
+   "scenario": "S4",
+   "title": "Crash in the middle of an upload, restart from the same state directory",
+   "id": "S4.2",
+   "check": "the request before the crash reached the server but got no answer",
+   "expected": "1 request stored without reply",
+   "measured": "1 (entries stored: [15]); 360 entries on the server at the crash",
+   "status": "PASS",
+   "req": []
+  },
+  {
+   "scenario": "S4",
+   "title": "Crash in the middle of an upload, restart from the same state directory",
+   "id": "S4.3",
+   "check": "minutes missing in channel 1 after the restart",
+   "expected": "none except the minute of the crash itself (06:00)",
+   "measured": "1 of 1455: 06:00",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S4",
+   "title": "Crash in the middle of an upload, restart from the same state directory",
+   "id": "S4.4",
+   "check": "sequence numbers survive the crash: contiguous and never reused for another minute",
+   "expected": "1..1454, 0 reused",
+   "measured": "1..1454, 1454 distinct, 0 reused",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S4",
+   "title": "Crash in the middle of an upload, restart from the same state directory",
+   "id": "S4.5",
+   "check": "the batch sent before the crash is sent again (duplicates in channel 1)",
+   "expected": ">= 1 duplicate entry",
+   "measured": "15 duplicate entries",
+   "status": "PASS",
+   "req": []
+  },
+  {
+   "scenario": "S4",
+   "title": "Crash in the middle of an upload, restart from the same state directory",
+   "id": "S4.6",
+   "check": "reference metrics after de-duplication (contract 6.1)",
+   "expected": "N = 1439 (every logged sample once), completeness >= 99.9 %",
+   "measured": "n = 1454 received, N = 1439, duplicates = 15, completeness 99.93 %",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S4",
+   "title": "Crash in the middle of an upload, restart from the same state directory",
+   "id": "S4.7n",
+   "check": "nightly job runs to the end (octave)",
+   "expected": "exit 0",
+   "measured": "exit 0 in 0.3 s",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S4",
+   "title": "Crash in the middle of an upload, restart from the same state directory",
+   "id": "S4.7a",
+   "check": "channel 2 equals the Python reference computed from channel 1 (rule 6.5) on 1 complete day(s)",
+   "expected": "1 of 1 agree",
+   "measured": "1 of 1 agree",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S4",
+   "title": "Crash in the middle of an upload, restart from the same state directory",
+   "id": "S4.7v",
+   "check": "channel-2 status carries v=1.5 and field8 = N unique",
+   "expected": "v=1.5; N equal",
+   "measured": "v=1.5; N equal",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S4",
+   "title": "Crash in the middle of an upload, restart from the same state directory",
+   "id": "S4.7d",
+   "check": "dashboard 'MATLAB check' column on the 1 complete day(s)",
+   "expected": "all 'agrees'",
+   "measured": "1 of 1 agree",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S4",
+   "title": "Crash in the middle of an upload, restart from the same state directory",
+   "id": "S4.7t",
+   "check": "dashboard daily table values equal the reference (3 s.f. energies, 1 dp others, N exact)",
+   "expected": "0 differences",
+   "measured": "0 differences",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S4",
+   "title": "Crash in the middle of an upload, restart from the same state directory",
+   "id": "S4.8",
+   "check": "channel-2 status reports the dropped duplicates (nd=)",
+   "expected": "nd=15",
+   "measured": "nd=15",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S5",
+   "title": "Lost responses -> duplicates in channel 1, metrics unaffected",
+   "id": "S5.1",
+   "check": "device runs a day with 3 lost responses (2 at 00:15, 1 at 12:00)",
+   "expected": "exit 0, 0",
+   "measured": "0, 0",
+   "status": "PASS",
+   "req": []
+  },
+  {
+   "scenario": "S5",
+   "title": "Lost responses -> duplicates in channel 1, metrics unaffected",
+   "id": "S5.2",
+   "check": "requests processed by the server without a reply",
+   "expected": "3",
+   "measured": "3",
+   "status": "PASS",
+   "req": []
+  },
+  {
+   "scenario": "S5",
+   "title": "Lost responses -> duplicates in channel 1, metrics unaffected",
+   "id": "S5.3",
+   "check": "duplicates in channel 1 (same seq stored twice)",
+   "expected": ">= 1",
+   "measured": "46 duplicate entries, 1501 entries for 1455 sequence numbers",
+   "status": "PASS",
+   "req": []
+  },
+  {
+   "scenario": "S5",
+   "title": "Lost responses -> duplicates in channel 1, metrics unaffected",
+   "id": "S5.4",
+   "check": "minutes missing in channel 1",
+   "expected": "0 of 1455",
+   "measured": "0 of 1455",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S5",
+   "title": "Lost responses -> duplicates in channel 1, metrics unaffected",
+   "id": "S5.5",
+   "check": "metrics unaffected by duplicates: reference energies equal a first-copy-per-seq sum",
+   "expected": "E_trk/E_fix/E_use equal, N = 1440",
+   "measured": "E = 4.2471/3.6054/2.9339 Wh (sum over all received copies would be 4.4943/3.8525/3.0272), N = 1440, n = 1486",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S5",
+   "title": "Lost responses -> duplicates in channel 1, metrics unaffected",
+   "id": "S5.6n",
+   "check": "nightly job runs to the end (octave)",
+   "expected": "exit 0",
+   "measured": "exit 0 in 0.4 s",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S5",
+   "title": "Lost responses -> duplicates in channel 1, metrics unaffected",
+   "id": "S5.6a",
+   "check": "channel 2 equals the Python reference computed from channel 1 (rule 6.5) on 1 complete day(s)",
+   "expected": "1 of 1 agree",
+   "measured": "1 of 1 agree",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S5",
+   "title": "Lost responses -> duplicates in channel 1, metrics unaffected",
+   "id": "S5.6v",
+   "check": "channel-2 status carries v=1.5 and field8 = N unique",
+   "expected": "v=1.5; N equal",
+   "measured": "v=1.5; N equal",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S5",
+   "title": "Lost responses -> duplicates in channel 1, metrics unaffected",
+   "id": "S5.6d",
+   "check": "dashboard 'MATLAB check' column on the 1 complete day(s)",
+   "expected": "all 'agrees'",
+   "measured": "1 of 1 agree",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S5",
+   "title": "Lost responses -> duplicates in channel 1, metrics unaffected",
+   "id": "S5.6t",
+   "check": "dashboard daily table values equal the reference (3 s.f. energies, 1 dp others, N exact)",
+   "expected": "0 differences",
+   "measured": "0 differences",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S5",
+   "title": "Lost responses -> duplicates in channel 1, metrics unaffected",
+   "id": "S5.7",
+   "check": "channel-2 row: N unique and duplicates dropped",
+   "expected": "field8 = 1440, nd=46",
+   "measured": "field8 = 1440, nd=46",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S5",
+   "title": "Lost responses -> duplicates in channel 1, metrics unaffected",
+   "id": "S5.8",
+   "check": "dashboard tells the user about the duplicates (data-quality note for the day)",
+   "expected": "note mentioning 46 duplicates",
+   "measured": "\u26a0 46 duplicate samples (repeated sequence number) received; duplicates do not raise completeness.",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S5b",
+   "title": "Lost responses with the server rejecting existing timestamps (assumed real behaviour)",
+   "id": "S5b.1",
+   "check": "device runs a day with 3 lost responses (2 at 00:15, 1 at 12:00)",
+   "expected": "exit 0, 0",
+   "measured": "0, 0",
+   "status": "PASS",
+   "req": []
+  },
+  {
+   "scenario": "S5b",
+   "title": "Lost responses with the server rejecting existing timestamps (assumed real behaviour)",
+   "id": "S5b.2",
+   "check": "requests processed by the server without a reply",
+   "expected": "3",
+   "measured": "3",
+   "status": "PASS",
+   "req": []
+  },
+  {
+   "scenario": "S5b",
+   "title": "Lost responses with the server rejecting existing timestamps (assumed real behaviour)",
+   "id": "S5b.3",
+   "check": "server policy 'reject existing timestamps': duplicates in channel 1",
+   "expected": "0",
+   "measured": "0 duplicate entries (46 re-sent entries dropped by the server)",
+   "status": "PASS",
+   "req": []
+  },
+  {
+   "scenario": "S5b",
+   "title": "Lost responses with the server rejecting existing timestamps (assumed real behaviour)",
+   "id": "S5b.4",
+   "check": "minutes missing in channel 1",
+   "expected": "0 of 1455",
+   "measured": "0 of 1455",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S5b",
+   "title": "Lost responses with the server rejecting existing timestamps (assumed real behaviour)",
+   "id": "S5b.5",
+   "check": "metrics unaffected by duplicates: reference energies equal a first-copy-per-seq sum",
+   "expected": "E_trk/E_fix/E_use equal, N = 1440",
+   "measured": "E = 4.2471/3.6054/2.9339 Wh (sum over all received copies would be 4.2471/3.6054/2.9339), N = 1440, n = 1440",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S5b",
+   "title": "Lost responses with the server rejecting existing timestamps (assumed real behaviour)",
+   "id": "S5b.6n",
+   "check": "nightly job runs to the end (octave)",
+   "expected": "exit 0",
+   "measured": "exit 0 in 0.4 s",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S5b",
+   "title": "Lost responses with the server rejecting existing timestamps (assumed real behaviour)",
+   "id": "S5b.6a",
+   "check": "channel 2 equals the Python reference computed from channel 1 (rule 6.5) on 1 complete day(s)",
+   "expected": "1 of 1 agree",
+   "measured": "1 of 1 agree",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S5b",
+   "title": "Lost responses with the server rejecting existing timestamps (assumed real behaviour)",
+   "id": "S5b.6v",
+   "check": "channel-2 status carries v=1.5 and field8 = N unique",
+   "expected": "v=1.5; N equal",
+   "measured": "v=1.5; N equal",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S5b",
+   "title": "Lost responses with the server rejecting existing timestamps (assumed real behaviour)",
+   "id": "S5b.6d",
+   "check": "dashboard 'MATLAB check' column on the 1 complete day(s)",
+   "expected": "all 'agrees'",
+   "measured": "1 of 1 agree",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S5b",
+   "title": "Lost responses with the server rejecting existing timestamps (assumed real behaviour)",
+   "id": "S5b.6t",
+   "check": "dashboard daily table values equal the reference (3 s.f. energies, 1 dp others, N exact)",
+   "expected": "0 differences",
+   "measured": "0 differences",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S5b",
+   "title": "Lost responses with the server rejecting existing timestamps (assumed real behaviour)",
+   "id": "S5b.7",
+   "check": "channel-2 row: N unique and duplicates dropped",
+   "expected": "field8 = 1440, nd=0",
+   "measured": "field8 = 1440, nd=0",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S6",
+   "title": "HTTP 500 burst -> backoff 1, 2, 4, 8, 15 min",
+   "id": "S6.1",
+   "check": "device runs through 8 consecutive HTTP 500 answers",
+   "expected": "exit 0, 0",
+   "measured": "0, 0",
+   "status": "PASS",
+   "req": []
+  },
+  {
+   "scenario": "S6",
+   "title": "HTTP 500 burst -> backoff 1, 2, 4, 8, 15 min",
+   "id": "S6.2",
+   "check": "waits between attempts after each failure",
+   "expected": "1, 2, 4, 8, 15, 15, 15, 15 min",
+   "measured": "1, 2, 4, 8, 15, 15, 15, 15 min",
+   "status": "PASS",
+   "req": [
+    "F8"
+   ]
+  },
+  {
+   "scenario": "S6",
+   "title": "HTTP 500 burst -> backoff 1, 2, 4, 8, 15 min",
+   "id": "S6.3",
+   "check": "first failure at the regular slot, recovery with HTTP 202",
+   "expected": "03:00:20, then 202",
+   "measured": "03:00:20, then 202",
+   "status": "PASS",
+   "req": [
+    "F8"
+   ]
+  },
+  {
+   "scenario": "S6",
+   "title": "HTTP 500 burst -> backoff 1, 2, 4, 8, 15 min",
+   "id": "S6.4",
+   "check": "no sample lost or duplicated by the failed uploads",
+   "expected": "0 missing, 0 duplicates",
+   "measured": "0 missing, 0 duplicates",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S6",
+   "title": "HTTP 500 burst -> backoff 1, 2, 4, 8, 15 min",
+   "id": "S6.5",
+   "check": "fault 9 appears only once no upload has succeeded for 60 min, and clears after recovery",
+   "expected": ">= 1 sample with e=9, all between 03:45 and 04:15",
+   "measured": "25 samples with e=9, 03:50 to 04:14",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S6",
+   "title": "HTTP 500 burst -> backoff 1, 2, 4, 8, 15 min",
+   "id": "S6.6",
+   "check": "the backlog after recovery is sent in one request",
+   "expected": "1 request with 75-91 entries",
+   "measured": "90 entries",
+   "status": "PASS",
+   "req": [
+    "F8"
+   ]
+  },
+  {
+   "scenario": "S7",
+   "title": "Large backlog (3 days offline): request spacing and batch size",
+   "id": "S7.1",
+   "check": "device runs 3 days offline, then back-fills",
+   "expected": "exit 0",
+   "measured": "exit 0",
+   "status": "PASS",
+   "req": []
+  },
+  {
+   "scenario": "S7",
+   "title": "Large backlog (3 days offline): request spacing and batch size",
+   "id": "S7.2",
+   "check": "HTTP 429 (too many requests) answers from the server",
+   "expected": "0",
+   "measured": "0 of 15 requests",
+   "status": "PASS",
+   "req": [
+    "F8"
+   ]
+  },
+  {
+   "scenario": "S7",
+   "title": "Large backlog (3 days offline): request spacing and batch size",
+   "id": "S7.3",
+   "check": "entries per back-fill request",
+   "expected": "<= 960, backlog of 4320+ sent in >= 5 requests",
+   "measured": "max 960; first requests [960, 960, 960, 960, 496, 14, 15]",
+   "status": "PASS",
+   "req": [
+    "F8"
+   ]
+  },
+  {
+   "scenario": "S7",
+   "title": "Large backlog (3 days offline): request spacing and batch size",
+   "id": "S7.4",
+   "check": "shortest time between two requests to channel 1",
+   "expected": ">= 16 s",
+   "measured": "16 s (over 15 requests)",
+   "status": "PASS",
+   "req": [
+    "F8"
+   ]
+  },
+  {
+   "scenario": "S7",
+   "title": "Large backlog (3 days offline): request spacing and batch size",
+   "id": "S7.5",
+   "check": "channel 1 after back-fill",
+   "expected": "0 missing minutes, 0 duplicates",
+   "measured": "0 missing of 4485, 0 duplicates",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S7",
+   "title": "Large backlog (3 days offline): request spacing and batch size",
+   "id": "S7.6",
+   "check": "back-fill time after Wi-Fi returned",
+   "expected": "first request <= 15 min, backlog cleared <= 20 min",
+   "measured": "first request after 0 min 20 s, backlog cleared after 1 min 24 s (4 full batches)",
+   "status": "PASS",
+   "req": [
+    "F8"
+   ]
+  },
+  {
+   "scenario": "S8",
+   "title": "Offline longer than the 8-day buffer: loss is flagged (fault 6) and counted",
+   "id": "S8.1",
+   "check": "device runs 9 days offline (buffer holds 8), then reconnects",
+   "expected": "exit 0",
+   "measured": "exit 0",
+   "status": "PASS",
+   "req": []
+  },
+  {
+   "scenario": "S8",
+   "title": "Offline longer than the 8-day buffer: loss is flagged (fault 6) and counted",
+   "id": "S8.2",
+   "check": "minutes lost (not in channel 1)",
+   "expected": "1440 to 1500 in one block (9 days offline + up to 1 h, minus the 11520-record buffer)",
+   "measured": "1455 minutes in 1 block(s): 2026-11-20T00:45:00Z to 2026-11-21T00:59:00Z",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S8",
+   "title": "Offline longer than the 8-day buffer: loss is flagged (fault 6) and counted",
+   "id": "S8.3",
+   "check": "loss counted by sequence numbers (never reused, so the gap equals the loss)",
+   "expected": "seq gap = 1455",
+   "measured": "seq gap = 1455 (seq 1..13125, 11670 received)",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S8",
+   "title": "Offline longer than the 8-day buffer: loss is flagged (fault 6) and counted",
+   "id": "S8.4",
+   "check": "fault 6 (buffer overflow, data lost) visible in channel-1 status",
+   "expected": ">= 1 sample with e=6",
+   "measured": "1455 samples with e=6, 2026-11-28T00:46:00Z to 2026-11-29T01:00:00Z",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S8",
+   "title": "Offline longer than the 8-day buffer: loss is flagged (fault 6) and counted",
+   "id": "S8.5",
+   "check": "the device's own count of overwritten records (device log)",
+   "expected": "1455 (= minutes missing on the server)",
+   "measured": "1455",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S8",
+   "title": "Offline longer than the 8-day buffer: loss is flagged (fault 6) and counted",
+   "id": "S8.6",
+   "check": "reference completeness shows the loss on the affected days",
+   "expected": "missing samples on 2026-11-20, 2026-11-21 add up to 1455",
+   "measured": "1455 (11-20: 3.1 %, 11-21: 95.8 %)",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S8",
+   "title": "Offline longer than the 8-day buffer: loss is flagged (fault 6) and counted",
+   "id": "S8.7",
+   "check": "dashboard daily table: completeness of the affected day(s)",
+   "expected": "< 99 % and equal to the reference",
+   "measured": "11-20: 3.1 %, 11-21: 95.8 %",
+   "status": "PASS",
+   "req": [
+    "F7",
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S8",
+   "title": "Offline longer than the 8-day buffer: loss is flagged (fault 6) and counted",
+   "id": "S8.8",
+   "check": "dashboard day view of 2026-11-20: completeness card states received/expected samples",
+   "expected": "45 of 1440",
+   "measured": "45 of 1440 expected samples \u00b7 0 gaps",
+   "status": "PASS",
+   "req": [
+    "F7",
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S8",
+   "title": "Offline longer than the 8-day buffer: loss is flagged (fault 6) and counted",
+   "id": "S8.9",
+   "check": "dashboard day view of 2026-11-28: fault 6 named in the data-quality notes",
+   "expected": "note with fault code 6 (1394 samples that day)",
+   "measured": "\u26a0 1440 samples report a fault: code 6 (Local buffer overflow (data lost)), 9 (Upload failing for over 60 minut",
+   "status": "PASS",
+   "req": [
+    "F7",
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S9",
+   "title": "RTC lost time at boot, no network for 3 h",
+   "id": "S9.1",
+   "check": "device boots with the RTC oscillator-stop flag and no Wi-Fi until 03:00",
+   "expected": "exit 0",
+   "measured": "exit 0",
+   "status": "PASS",
+   "req": []
+  },
+  {
+   "scenario": "S9",
+   "title": "RTC lost time at boot, no network for 3 h",
+   "id": "S9.2",
+   "check": "entries with a timestamp from before the clock was valid (or outside the test period)",
+   "expected": "0",
+   "measured": "0 before 02:59, 0 after the end; first entry 2026-11-20T03:00:00Z",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S9",
+   "title": "RTC lost time at boot, no network for 3 h",
+   "id": "S9.3",
+   "check": "logging resumes once NTP has set the clock",
+   "expected": "first entry between 02:59 and 03:02",
+   "measured": "03:00",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S9",
+   "title": "RTC lost time at boot, no network for 3 h",
+   "id": "S9.4",
+   "check": "after the clock is valid: minutes missing up to 06:29",
+   "expected": "0",
+   "measured": "0 of 210",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S9",
+   "title": "RTC lost time at boot, no network for 3 h",
+   "id": "S9.5",
+   "check": "fault 4 (clock lost) visible in channel-1 status",
+   "expected": ">= 1 sample with e=4",
+   "measured": "1 sample(s) with e=4, first at 03:00",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S9",
+   "title": "RTC lost time at boot, no network for 3 h",
+   "id": "S9.6",
+   "check": "sequence numbers of the logged samples",
+   "expected": "contiguous, no reuse",
+   "measured": "1..210, 210 distinct of 210",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S9",
+   "title": "RTC lost time at boot, no network for 3 h",
+   "id": "S9.7",
+   "check": "dashboard day view: fault 4 named in the data-quality notes",
+   "expected": "note with fault code 4",
+   "measured": "\u26a0 1 sample reports a fault: code 4 (Clock (RTC) missing or lost time).",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S10",
+   "title": "Dashboard vs nightly job on every complete day (5 different days), two phones, CSV export",
+   "id": "S10.1",
+   "check": "5 days: clear r=0 / cloudy r=12 panel A with lost responses / overcast r=13 panel B with a 3 h outage / dark (no power) / calibration r=900",
+   "expected": "exit 0 x 5",
+   "measured": "[0, 0, 0, 0, 0]",
+   "status": "PASS",
+   "req": []
+  },
+  {
+   "scenario": "S10",
+   "title": "Dashboard vs nightly job on every complete day (5 different days), two phones, CSV export",
+   "id": "S10.2n",
+   "check": "nightly job runs to the end (octave)",
+   "expected": "exit 0",
+   "measured": "exit 0 in 1.3 s",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S10",
+   "title": "Dashboard vs nightly job on every complete day (5 different days), two phones, CSV export",
+   "id": "S10.2a",
+   "check": "channel 2 equals the Python reference computed from channel 1 (rule 6.5) on 5 complete day(s)",
+   "expected": "5 of 5 agree",
+   "measured": "5 of 5 agree",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S10",
+   "title": "Dashboard vs nightly job on every complete day (5 different days), two phones, CSV export",
+   "id": "S10.2v",
+   "check": "channel-2 status carries v=1.5 and field8 = N unique",
+   "expected": "v=1.5; N equal",
+   "measured": "v=1.5; N equal",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S10",
+   "title": "Dashboard vs nightly job on every complete day (5 different days), two phones, CSV export",
+   "id": "S10.2d",
+   "check": "dashboard 'MATLAB check' column on the 5 complete day(s)",
+   "expected": "all 'agrees'",
+   "measured": "5 of 5 agree",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S10",
+   "title": "Dashboard vs nightly job on every complete day (5 different days), two phones, CSV export",
+   "id": "S10.2t",
+   "check": "dashboard daily table values equal the reference (3 s.f. energies, 1 dp others, N exact)",
+   "expected": "0 differences",
+   "measured": "0 differences",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S10",
+   "title": "Dashboard vs nightly job on every complete day (5 different days), two phones, CSV export",
+   "id": "S10.3",
+   "check": "edge cases present in the data set",
+   "expected": "duplicates > 0; a day with E_fix = 0 (gains undefined); 5 x 1440 unique samples",
+   "measured": "duplicates 31; dark day E_fix = 0.000 Wh, gross = None; N = [1440, 1440, 1440, 1440, 1440]",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S10",
+   "title": "Dashboard vs nightly job on every complete day (5 different days), two phones, CSV export",
+   "id": "S10.4",
+   "check": "channel-2 row of the dark day omits both gains (contract 3.2)",
+   "expected": "field4, field5 empty",
+   "measured": "field4 = None, field5 = None",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S10",
+   "title": "Dashboard vs nightly job on every complete day (5 different days), two phones, CSV export",
+   "id": "S10.5",
+   "check": "KPI cards of each of the 5 days equal the reference (7 figures per day)",
+   "expected": "0 differences in 35 figures",
+   "measured": "0 differences",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S10",
+   "title": "Dashboard vs nightly job on every complete day (5 different days), two phones, CSV export",
+   "id": "S10.6",
+   "check": "two emulated phones (iPhone 13 / Pixel 7 profiles) show the same figures",
+   "expected": "8 KPI values and the daily table identical",
+   "measured": "8 KPI values compared, 0 differ; 5 table rows compared, identical",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S10",
+   "title": "Dashboard vs nightly job on every complete day (5 different days), two phones, CSV export",
+   "id": "S10.7",
+   "check": "raw-samples CSV export (download) equals channel 1: header as agreed in PLAN.md, one row per received entry, every value equal",
+   "expected": "7246 rows, 0 differences",
+   "measured": "7246 rows, 0 differences",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S10",
+   "title": "Dashboard vs nightly job on every complete day (5 different days), two phones, CSV export",
+   "id": "S10.8",
+   "check": "CSV export equals the device's own log: minute, 7 values and status of every logged sample (7216 log lines)",
+   "expected": "0 rows differ; only samples logged after the last upload are absent (<= 16)",
+   "measured": "0 of 7246 rows differ; 1 logged samples not yet uploaded",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S10",
+   "title": "Dashboard vs nightly job on every complete day (5 different days), two phones, CSV export",
+   "id": "S10.9",
+   "check": "dashboard uses READ access only",
+   "expected": "0 requests containing a write key, 0 non-GET requests to the API",
+   "measured": "48 API requests: 0 with a write key, 0 non-GET",
+   "status": "PASS",
+   "req": [
+    "F8"
+   ]
+  },
+  {
+   "scenario": "S10",
+   "title": "Dashboard vs nightly job on every complete day (5 different days), two phones, CSV export",
+   "id": "S10.10",
+   "check": "JavaScript errors on the 8 pages opened",
+   "expected": "0",
+   "measured": "0",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S11",
+   "title": "Completeness on normal days (including a short Wi-Fi drop)",
+   "id": "S11.1",
+   "check": "3 days (clear, cloudy, overcast); day 2 has a 45-minute Wi-Fi drop",
+   "expected": "exit 0 x 3",
+   "measured": "[0, 0, 0]",
+   "status": "PASS",
+   "req": []
+  },
+  {
+   "scenario": "S11",
+   "title": "Completeness on normal days (including a short Wi-Fi drop)",
+   "id": "S11.2n",
+   "check": "nightly job runs to the end (octave)",
+   "expected": "exit 0",
+   "measured": "exit 0 in 0.9 s",
+   "status": "PASS",
+   "req": [
+    "F7",
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S11",
+   "title": "Completeness on normal days (including a short Wi-Fi drop)",
+   "id": "S11.2a",
+   "check": "channel 2 equals the Python reference computed from channel 1 (rule 6.5) on 3 complete day(s)",
+   "expected": "3 of 3 agree",
+   "measured": "3 of 3 agree",
+   "status": "PASS",
+   "req": [
+    "F7",
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S11",
+   "title": "Completeness on normal days (including a short Wi-Fi drop)",
+   "id": "S11.2v",
+   "check": "channel-2 status carries v=1.5 and field8 = N unique",
+   "expected": "v=1.5; N equal",
+   "measured": "v=1.5; N equal",
+   "status": "PASS",
+   "req": [
+    "F7",
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S11",
+   "title": "Completeness on normal days (including a short Wi-Fi drop)",
+   "id": "S11.2d",
+   "check": "dashboard 'MATLAB check' column on the 3 complete day(s)",
+   "expected": "all 'agrees'",
+   "measured": "3 of 3 agree",
+   "status": "PASS",
+   "req": [
+    "F7",
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S11",
+   "title": "Completeness on normal days (including a short Wi-Fi drop)",
+   "id": "S11.2t",
+   "check": "dashboard daily table values equal the reference (3 s.f. energies, 1 dp others, N exact)",
+   "expected": "0 differences",
+   "measured": "0 differences",
+   "status": "PASS",
+   "req": [
+    "F7",
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S11",
+   "title": "Completeness on normal days (including a short Wi-Fi drop)",
+   "id": "S11.3",
+   "check": "reference completeness per day",
+   "expected": ">= 99 %",
+   "measured": "100.00 %, 100.00 %, 100.00 %",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S11",
+   "title": "Completeness on normal days (including a short Wi-Fi drop)",
+   "id": "S11.4",
+   "check": "channel-2 field7 (completeness written by the nightly job)",
+   "expected": ">= 99 %",
+   "measured": "100.0 %, 100.0 %, 100.0 %",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S11",
+   "title": "Completeness on normal days (including a short Wi-Fi drop)",
+   "id": "S11.5",
+   "check": "dashboard 'Complete %' column",
+   "expected": ">= 99 %",
+   "measured": "100.0 %, 100.0 %, 100.0 %",
+   "status": "PASS",
+   "req": [
+    "F7"
+   ]
+  },
+  {
+   "scenario": "S12",
+   "title": "Sample-to-screen latency (virtual time)",
+   "id": "S12.1",
+   "check": "device runs from 00:00 to 12:16",
+   "expected": "exit 0",
+   "measured": "exit 0",
+   "status": "PASS",
+   "req": []
+  },
+  {
+   "scenario": "S12",
+   "title": "Sample-to-screen latency (virtual time)",
+   "id": "S12.2",
+   "check": "end of minute -> on the server (F8 target 16 min)",
+   "expected": "<= 16 min 00 s",
+   "measured": "max 14 min 20 s, mean 7 min 20 s (n=735)",
+   "status": "PASS",
+   "req": [
+    "F8"
+   ]
+  },
+  {
+   "scenario": "S12",
+   "title": "Sample-to-screen latency (virtual time)",
+   "id": "S12.3",
+   "check": "dashboard opened one refresh period (60 s) after the upload shows every uploaded sample of today",
+   "expected": "Samples = 735, status 'fresh'",
+   "measured": "Samples = 735, status 'fresh', page ready in 0.4 s",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S12",
+   "title": "Sample-to-screen latency (virtual time)",
+   "id": "S12.4",
+   "check": "dashboard refreshes by itself (page left open 20 s with refresh=15 s)",
+   "expected": ">= 1 automatic reload of the data",
+   "measured": "4 data requests after the first load",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S12",
+   "title": "Sample-to-screen latency (virtual time)",
+   "id": "S12.5",
+   "check": "worst-case sample-to-screen = server latency + refresh period + page update",
+   "expected": "<= 17 min 00 s",
+   "measured": "15 min 20 s = 14 min 20 s + 60 s + 0.4 s",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  },
+  {
+   "scenario": "S12",
+   "title": "Sample-to-screen latency (virtual time)",
+   "id": "S12.6",
+   "check": "newest uploaded sample (on screen, see check 3) when the dashboard is opened 60 s after an upload",
+   "expected": "sample of 12:14, age <= 3 min",
+   "measured": "sample of 12:14, age 1 min 20 s",
+   "status": "PASS",
+   "req": [
+    "F9"
+   ]
+  }
+ ],
+ "findings": [],
+ "nightly_runs": [
+  {
+   "scenario": "S1",
+   "now": "2026-11-23T00:20:00Z",
+   "ndays": "script default (9)",
+   "rc": 0,
+   "wall_s": 0.8,
+   "out": "AST nightly, contract v1.5. Now 2026-11-23 00:20:00 UTC. Days 2026-11-14 to 2026-11-22.\nChannel 1001: 3 request(s), 0 window split(s), 4320 entries read, 4320 in range, 0 without a readable time.\ndate        n     N     dup  sim   E_trk Wh    E_fix Wh    E_use Wh    gross %   net %     MAE deg  complete %\n2026-11-14  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-15  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-16  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-17  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-18  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-19  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-20  1440  1440  0    1440  4.24715     3.60536     2.93470     17.8010   -63.5972  1.5038   100.0000\n2026-11-21  1440  1440  0    1440  4.21960     3.61819     2.93435     16.6218   -64.4780  1.4019   100.0000\n2026-11-22  1440  1440  0    1440  3.15377     2.72222     2.93191     15.8531   -91.8497  1.3577   100.0000\nChannel 1002: wrote 9 row(s) in one bulk update. Elapsed 0.7 s.\nwarning: function /home/claude/ast-datalink/analysis/tests/octave_shims/webwrite.m shadows a core library function\n"
+  },
+  {
+   "scenario": "S2",
+   "now": "2026-11-21T00:20:00Z",
+   "ndays": "script default (9)",
+   "rc": 0,
+   "wall_s": 0.3,
+   "out": "AST nightly, contract v1.5. Now 2026-11-21 00:20:00 UTC. Days 2026-11-12 to 2026-11-20.\nChannel 1001: 3 request(s), 0 window split(s), 1440 entries read, 1440 in range, 0 without a readable time.\ndate        n     N     dup  sim   E_trk Wh    E_fix Wh    E_use Wh    gross %   net %     MAE deg  complete %\n2026-11-12  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-13  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-14  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-15  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-16  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-17  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-18  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-19  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-20  1440  1440  0    1440  4.24715     3.60536     2.93470     17.8010   -63.5972  1.5038   100.0000\nChannel 1002: wrote 9 row(s) in one bulk update. Elapsed 0.2 s.\nwarning: function /home/claude/ast-datalink/analysis/tests/octave_shims/webwrite.m shadows a core library function\n"
+  },
+  {
+   "scenario": "S3",
+   "now": "2026-11-21T00:20:00Z",
+   "ndays": "script default (9)",
+   "rc": 0,
+   "wall_s": 0.17,
+   "out": "AST nightly, contract v1.5. Now 2026-11-21 00:20:00 UTC. Days 2026-11-12 to 2026-11-20.\nChannel 1001: 3 request(s), 0 window split(s), 345 entries read, 345 in range, 0 without a readable time.\ndate        n     N     dup  sim   E_trk Wh    E_fix Wh    E_use Wh    gross %   net %     MAE deg  complete %\n2026-11-12  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-13  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-14  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-15  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-16  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-17  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-18  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-19  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-20  345   345   0    345   0           0           0.689868    -         -         -        23.9583\nChannel 1002: wrote 9 row(s) in one bulk update. Elapsed 0.1 s.\nwarning: function /home/claude/ast-datalink/analysis/tests/octave_shims/webwrite.m shadows a core library function\n"
+  },
+  {
+   "scenario": "S3",
+   "now": "2026-11-22T00:20:00Z",
+   "ndays": "script default (9)",
+   "rc": 0,
+   "wall_s": 0.15,
+   "out": "AST nightly, contract v1.5. Now 2026-11-22 00:20:00 UTC. Days 2026-11-13 to 2026-11-21.\nChannel 1001: 3 request(s), 0 window split(s), 345 entries read, 345 in range, 0 without a readable time.\ndate        n     N     dup  sim   E_trk Wh    E_fix Wh    E_use Wh    gross %   net %     MAE deg  complete %\n2026-11-13  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-14  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-15  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-16  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-17  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-18  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-19  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-20  345   345   0    345   0           0           0.689868    -         -         -        23.9583\n2026-11-21  0     0     0    0     0           0           0           -         -         -        0.0000\nChannel 1002: wrote 9 row(s) in one bulk update. Elapsed 0.1 s.\nwarning: function /home/claude/ast-datalink/analysis/tests/octave_shims/webwrite.m shadows a core library function\n"
+  },
+  {
+   "scenario": "S3",
+   "now": "2026-11-23T00:20:00Z",
+   "ndays": "script default (9)",
+   "rc": 0,
+   "wall_s": 0.19,
+   "out": "AST nightly, contract v1.5. Now 2026-11-23 00:20:00 UTC. Days 2026-11-14 to 2026-11-22.\nChannel 1001: 3 request(s), 0 window split(s), 345 entries read, 345 in range, 0 without a readable time.\ndate        n     N     dup  sim   E_trk Wh    E_fix Wh    E_use Wh    gross %   net %     MAE deg  complete %\n2026-11-14  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-15  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-16  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-17  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-18  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-19  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-20  345   345   0    345   0           0           0.689868    -         -         -        23.9583\n2026-11-21  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-22  0     0     0    0     0           0           0           -         -         -        0.0000\nChannel 1002: wrote 9 row(s) in one bulk update. Elapsed 0.1 s.\nwarning: function /home/claude/ast-datalink/analysis/tests/octave_shims/webwrite.m shadows a core library function\n"
+  },
+  {
+   "scenario": "S3",
+   "now": "2026-11-24T00:20:00Z",
+   "ndays": "script default (9)",
+   "rc": 0,
+   "wall_s": 0.16,
+   "out": "AST nightly, contract v1.5. Now 2026-11-24 00:20:00 UTC. Days 2026-11-15 to 2026-11-23.\nChannel 1001: 3 request(s), 0 window split(s), 345 entries read, 345 in range, 0 without a readable time.\ndate        n     N     dup  sim   E_trk Wh    E_fix Wh    E_use Wh    gross %   net %     MAE deg  complete %\n2026-11-15  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-16  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-17  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-18  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-19  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-20  345   345   0    345   0           0           0.689868    -         -         -        23.9583\n2026-11-21  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-22  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-23  0     0     0    0     0           0           0           -         -         -        0.0000\nChannel 1002: wrote 9 row(s) in one bulk update. Elapsed 0.1 s.\nwarning: function /home/claude/ast-datalink/analysis/tests/octave_shims/webwrite.m shadows a core library function\n"
+  },
+  {
+   "scenario": "S3",
+   "now": "2026-11-25T00:20:00Z",
+   "ndays": "script default (9)",
+   "rc": 0,
+   "wall_s": 0.19,
+   "out": "AST nightly, contract v1.5. Now 2026-11-25 00:20:00 UTC. Days 2026-11-16 to 2026-11-24.\nChannel 1001: 3 request(s), 0 window split(s), 345 entries read, 345 in range, 0 without a readable time.\ndate        n     N     dup  sim   E_trk Wh    E_fix Wh    E_use Wh    gross %   net %     MAE deg  complete %\n2026-11-16  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-17  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-18  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-19  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-20  345   345   0    345   0           0           0.689868    -         -         -        23.9583\n2026-11-21  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-22  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-23  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-24  0     0     0    0     0           0           0           -         -         -        0.0000\nChannel 1002: wrote 9 row(s) in one bulk update. Elapsed 0.1 s.\nwarning: function /home/claude/ast-datalink/analysis/tests/octave_shims/webwrite.m shadows a core library function\n"
+  },
+  {
+   "scenario": "S3",
+   "now": "2026-11-26T00:20:00Z",
+   "ndays": "script default (9)",
+   "rc": 0,
+   "wall_s": 0.17,
+   "out": "AST nightly, contract v1.5. Now 2026-11-26 00:20:00 UTC. Days 2026-11-17 to 2026-11-25.\nChannel 1001: 3 request(s), 0 window split(s), 345 entries read, 345 in range, 0 without a readable time.\ndate        n     N     dup  sim   E_trk Wh    E_fix Wh    E_use Wh    gross %   net %     MAE deg  complete %\n2026-11-17  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-18  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-19  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-20  345   345   0    345   0           0           0.689868    -         -         -        23.9583\n2026-11-21  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-22  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-23  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-24  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-25  0     0     0    0     0           0           0           -         -         -        0.0000\nChannel 1002: wrote 9 row(s) in one bulk update. Elapsed 0.1 s.\nwarning: function /home/claude/ast-datalink/analysis/tests/octave_shims/webwrite.m shadows a core library function\n"
+  },
+  {
+   "scenario": "S3",
+   "now": "2026-11-27T00:20:00Z",
+   "ndays": "script default (9)",
+   "rc": 0,
+   "wall_s": 0.18,
+   "out": "AST nightly, contract v1.5. Now 2026-11-27 00:20:00 UTC. Days 2026-11-18 to 2026-11-26.\nChannel 1001: 3 request(s), 0 window split(s), 345 entries read, 345 in range, 0 without a readable time.\ndate        n     N     dup  sim   E_trk Wh    E_fix Wh    E_use Wh    gross %   net %     MAE deg  complete %\n2026-11-18  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-19  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-20  345   345   0    345   0           0           0.689868    -         -         -        23.9583\n2026-11-21  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-22  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-23  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-24  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-25  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-26  0     0     0    0     0           0           0           -         -         -        0.0000\nChannel 1002: wrote 9 row(s) in one bulk update. Elapsed 0.1 s.\nwarning: function /home/claude/ast-datalink/analysis/tests/octave_shims/webwrite.m shadows a core library function\n"
+  },
+  {
+   "scenario": "S3",
+   "now": "2026-11-28T00:20:00Z",
+   "ndays": 7,
+   "rc": 0,
+   "wall_s": 1.92,
+   "out": "AST nightly, contract v1.5. Now 2026-11-28 00:20:00 UTC. Days 2026-11-21 to 2026-11-27.\nChannel 1001: 2 request(s), 0 window split(s), 10080 entries read, 10080 in range, 0 without a readable time.\ndate        n     N     dup  sim   E_trk Wh    E_fix Wh    E_use Wh    gross %   net %     MAE deg  complete %\n2026-11-21  1440  1440  0    1440  4.21960     3.61819     2.93435     16.6218   -64.4780  1.4019   100.0000\n2026-11-22  1440  1440  0    1440  3.15377     2.72222     2.93191     15.8531   -91.8497  1.3577   100.0000\n2026-11-23  1440  1440  0    1440  3.32205     2.85163     2.93512     16.4965   -86.4311  1.1960   100.0000\n2026-11-24  1440  1440  0    1440  3.64865     3.14691     2.93497     15.9441   -77.3212  1.4593   100.0000\n2026-11-25  1440  1440  0    1440  3.58321     3.10614     2.93449     15.3588   -79.1150  1.4380   100.0000\n2026-11-26  1440  1440  0    1440  3.75857     3.24616     2.93336     15.7851   -74.5787  1.4375   100.0000\n2026-11-27  1440  1440  0    1440  3.22532     2.77029     2.93319     16.4253   -89.4551  1.1773   100.0000\nChannel 1002: wrote 7 row(s) in one bulk update. Elapsed 1.8 s.\nwarning: function /home/claude/ast-datalink/analysis/tests/octave_shims/webwrite.m shadows a core library function\n"
+  },
+  {
+   "scenario": "S3",
+   "now": "2026-11-28T00:40:00Z",
+   "ndays": "script default (9)",
+   "rc": 0,
+   "wall_s": 2.54,
+   "out": "AST nightly, contract v1.5. Now 2026-11-28 00:40:00 UTC. Days 2026-11-19 to 2026-11-27.\nChannel 1001: 3 request(s), 0 window split(s), 11520 entries read, 11520 in range, 0 without a readable time.\ndate        n     N     dup  sim   E_trk Wh    E_fix Wh    E_use Wh    gross %   net %     MAE deg  complete %\n2026-11-19  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-20  1440  1440  0    1440  4.24715     3.60536     2.93470     17.8010   -63.5972  1.5038   100.0000\n2026-11-21  1440  1440  0    1440  4.21960     3.61819     2.93435     16.6218   -64.4780  1.4019   100.0000\n2026-11-22  1440  1440  0    1440  3.15377     2.72222     2.93191     15.8531   -91.8497  1.3577   100.0000\n2026-11-23  1440  1440  0    1440  3.32205     2.85163     2.93512     16.4965   -86.4311  1.1960   100.0000\n2026-11-24  1440  1440  0    1440  3.64865     3.14691     2.93497     15.9441   -77.3212  1.4593   100.0000\n2026-11-25  1440  1440  0    1440  3.58321     3.10614     2.93449     15.3588   -79.1150  1.4380   100.0000\n2026-11-26  1440  1440  0    1440  3.75857     3.24616     2.93336     15.7851   -74.5787  1.4375   100.0000\n2026-11-27  1440  1440  0    1440  3.22532     2.77029     2.93319     16.4253   -89.4551  1.1773   100.0000\nChannel 1002: wrote 9 row(s) in one bulk update. Elapsed 2.4 s.\nwarning: function /home/claude/ast-datalink/analysis/tests/octave_shims/webwrite.m shadows a core library function\n"
+  },
+  {
+   "scenario": "S4",
+   "now": "2026-11-21T00:20:00Z",
+   "ndays": "script default (9)",
+   "rc": 0,
+   "wall_s": 0.33,
+   "out": "AST nightly, contract v1.5. Now 2026-11-21 00:20:00 UTC. Days 2026-11-12 to 2026-11-20.\nChannel 1001: 3 request(s), 0 window split(s), 1454 entries read, 1454 in range, 0 without a readable time.\ndate        n     N     dup  sim   E_trk Wh    E_fix Wh    E_use Wh    gross %   net %     MAE deg  complete %\n2026-11-12  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-13  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-14  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-15  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-16  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-17  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-18  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-19  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-20  1454  1439  15   1439  4.24715     3.60536     2.93265     17.8010   -63.5403  1.5038   99.9306\nChannel 1002: wrote 9 row(s) in one bulk update. Elapsed 0.2 s.\nwarning: function /home/claude/ast-datalink/analysis/tests/octave_shims/webwrite.m shadows a core library function\n"
+  },
+  {
+   "scenario": "S5",
+   "now": "2026-11-21T00:20:00Z",
+   "ndays": "script default (9)",
+   "rc": 0,
+   "wall_s": 0.36,
+   "out": "AST nightly, contract v1.5. Now 2026-11-21 00:20:00 UTC. Days 2026-11-12 to 2026-11-20.\nChannel 1001: 3 request(s), 0 window split(s), 1486 entries read, 1486 in range, 0 without a readable time.\ndate        n     N     dup  sim   E_trk Wh    E_fix Wh    E_use Wh    gross %   net %     MAE deg  complete %\n2026-11-12  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-13  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-14  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-15  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-16  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-17  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-18  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-19  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-20  1486  1440  46   1440  4.24709     3.60537     2.93387     17.7992   -63.5758  1.5054   100.0000\nChannel 1002: wrote 9 row(s) in one bulk update. Elapsed 0.3 s.\nwarning: function /home/claude/ast-datalink/analysis/tests/octave_shims/webwrite.m shadows a core library function\n"
+  },
+  {
+   "scenario": "S5b",
+   "now": "2026-11-21T00:20:00Z",
+   "ndays": "script default (9)",
+   "rc": 0,
+   "wall_s": 0.4,
+   "out": "AST nightly, contract v1.5. Now 2026-11-21 00:20:00 UTC. Days 2026-11-12 to 2026-11-20.\nChannel 1001: 3 request(s), 0 window split(s), 1440 entries read, 1440 in range, 0 without a readable time.\ndate        n     N     dup  sim   E_trk Wh    E_fix Wh    E_use Wh    gross %   net %     MAE deg  complete %\n2026-11-12  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-13  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-14  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-15  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-16  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-17  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-18  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-19  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-20  1440  1440  0    1440  4.24709     3.60537     2.93387     17.7992   -63.5758  1.5054   100.0000\nChannel 1002: wrote 9 row(s) in one bulk update. Elapsed 0.3 s.\nwarning: function /home/claude/ast-datalink/analysis/tests/octave_shims/webwrite.m shadows a core library function\n"
+  },
+  {
+   "scenario": "S10",
+   "now": "2026-11-25T00:20:00Z",
+   "ndays": "script default (9)",
+   "rc": 0,
+   "wall_s": 1.32,
+   "out": "AST nightly, contract v1.5. Now 2026-11-25 00:20:00 UTC. Days 2026-11-16 to 2026-11-24.\nChannel 1001: 3 request(s), 0 window split(s), 7231 entries read, 7231 in range, 0 without a readable time.\ndate        n     N     dup  sim   E_trk Wh    E_fix Wh    E_use Wh    gross %   net %     MAE deg  complete %\n2026-11-16  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-17  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-18  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-19  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-20  1470  1440  30   1440  6.64213     5.57344     2.93553     19.1748   -33.4953  1.5134   100.0000\n2026-11-21  1441  1440  1    1440  4.21960     3.61819     2.93435     16.6218   -64.4780  1.4019   100.0000\n2026-11-22  1440  1440  0    1440  0.831093    0.831067    2.87899     0.0032    -346.4177 -        100.0000\n2026-11-23  1440  1440  0    1440  0           0           2.88054     -         -         -        100.0000\n2026-11-24  1440  1440  0    1440  6.26542     5.29190     2.93581     18.3965   -37.0809  1.3925   100.0000\nChannel 1002: wrote 9 row(s) in one bulk update. Elapsed 1.2 s.\nwarning: function /home/claude/ast-datalink/analysis/tests/octave_shims/webwrite.m shadows a core library function\n"
+  },
+  {
+   "scenario": "S11",
+   "now": "2026-11-23T00:20:00Z",
+   "ndays": "script default (9)",
+   "rc": 0,
+   "wall_s": 0.87,
+   "out": "AST nightly, contract v1.5. Now 2026-11-23 00:20:00 UTC. Days 2026-11-14 to 2026-11-22.\nChannel 1001: 3 request(s), 0 window split(s), 4320 entries read, 4320 in range, 0 without a readable time.\ndate        n     N     dup  sim   E_trk Wh    E_fix Wh    E_use Wh    gross %   net %     MAE deg  complete %\n2026-11-14  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-15  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-16  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-17  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-18  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-19  0     0     0    0     0           0           0           -         -         -        0.0000\n2026-11-20  1440  1440  0    1440  6.64213     5.57344     2.93553     19.1748   -33.4953  1.5134   100.0000\n2026-11-21  1440  1440  0    1440  4.21960     3.61819     2.93435     16.6218   -64.4780  1.4019   100.0000\n2026-11-22  1440  1440  0    1440  0.831093    0.831067    2.87899     0.0032    -346.4177 -        100.0000\nChannel 1002: wrote 9 row(s) in one bulk update. Elapsed 0.8 s.\nwarning: function /home/claude/ast-datalink/analysis/tests/octave_shims/webwrite.m shadows a core library function\n"
+  }
+ ]
+}

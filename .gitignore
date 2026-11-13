@@ -1,0 +1,9 @@
+# build outputs and caches
+firmware/host/build/
+__pycache__/
+.pytest_cache/
+node_modules/
+analysis/tests/out/
+*.o
+# secrets: never commit
+firmware/ast_datalink/secrets.h

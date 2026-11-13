@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Active Solar Tracker data link</title>
+<meta name="description" content="EEE3035 Group 8 Active Solar Tracker: live data from the tracker, how the data link works, and what each subsystem needs to plug in.">
+<link rel="icon" href="dashboard/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Lab-notebook hub: cool paper, ink-teal text, solar amber for the actions that matter. */
+  --paper: #f5f7f7; --sheet: #ffffff; --ink: #15292d; --muted: #4e6266; --rule: #d5dfe0;
+  --accent: #b45f06; --accent-ink: #ffffff; --accent-soft: #fbefe1;
+  --pass: #1d7a46; --pass-soft: #e3f3e9; --wait: #8a5a00; --wait-soft: #fff3d6; --risk: #b3261e; --risk-soft: #fbe7e5;
+  --gain: #2c6e8f; --use: #b45f06;
+  --font-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1a1c; --sheet: #152427; --ink: #e3eced; --muted: #a3b5b8; --rule: #2a3d40;
+    --accent: #f0a04b; --accent-ink: #1b1206; --accent-soft: #33240f; --pass: #6fcf97; --pass-soft: #163024;
+    --wait: #f2c94c; --wait-soft: #332a10; --risk: #ff8a80; --risk-soft: #3a1a18; --gain: #7ec4e4; --use: #f0a04b; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f1a1c; --sheet: #152427; --ink: #e3eced; --muted: #a3b5b8; --rule: #2a3d40;
+  --accent: #f0a04b; --accent-ink: #1b1206; --accent-soft: #33240f; --pass: #6fcf97; --pass-soft: #163024;
+  --wait: #f2c94c; --wait-soft: #332a10; --risk: #ff8a80; --risk-soft: #3a1a18; --gain: #7ec4e4; --use: #f0a04b; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { background: var(--paper); }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 16px/1.55 var(--font-body); }
+main { max-width: 900px; margin: 0 auto; padding: 32px 20px 64px; display: grid; gap: 30px; }
+h1, h2, h3 { font-family: var(--font-display); line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: 2.2rem; font-weight: 700; }
+h2 { font-size: 1.45rem; font-weight: 700; }
+h3 { font-size: 1.08rem; font-weight: 600; }
+p { margin: 0; max-width: 70ch; }
+a { color: var(--gain); text-underline-offset: 2px; }
+a:focus-visible, .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+code, .mono { font-family: var(--font-mono); font-size: 0.88em; }
+.mast { display: grid; gap: 12px; padding-bottom: 20px; border-bottom: 2px solid var(--ink); }
+.kicker { font: 500 0.85rem/1.3 var(--font-mono); color: var(--muted); }
+.lede { font-size: 1.08rem; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 8px; font-weight: 600; text-decoration: none; border: 1px solid var(--rule); background: var(--sheet); color: var(--ink); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font: 500 0.82rem/1.4 var(--font-body); white-space: nowrap; }
+.chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.chip.pass { color: var(--pass); background: var(--pass-soft); }
+.chip.wait { color: var(--wait); background: var(--wait-soft); }
+.chip.risk { color: var(--risk); background: var(--risk-soft); }
+section { display: grid; gap: 14px; }
+ol.flow { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; counter-reset: f; }
+ol.flow li { counter-increment: f; background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; display: grid; gap: 4px; align-content: start; }
+ol.flow li::before { content: counter(f); font: 700 1.2rem/1 var(--font-display); color: var(--accent); }
+ol.flow .what { font-size: 0.9rem; color: var(--muted); }
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; background: var(--sheet); }
+table { width: 100%; border-collapse: collapse; font-size: 0.93rem; }
+th, td { text-align: left; vertical-align: top; padding: 9px 14px; border-bottom: 1px solid var(--rule); }
+th { font: 600 0.8rem/1.3 var(--font-body); color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+tbody tr:last-child td { border-bottom: 0; }
+td.num { white-space: nowrap; }
+.key { background: var(--accent-soft); border-left: 4px solid var(--accent); border-radius: 6px; padding: 14px 16px; display: grid; gap: 8px; }
+figure { margin: 0; display: grid; gap: 8px; }
+figcaption { color: var(--muted); font-size: 0.88rem; max-width: 70ch; }
+.chart { width: 100%; max-width: 600px; height: auto; display: block; }
+svg text { font-family: var(--font-body); }
+ul.plain { margin: 0; padding-left: 1.2rem; display: grid; gap: 6px; }
+.foot { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--rule); padding-top: 14px; display: grid; gap: 6px; }
+@media (max-width: 560px) {
+  h1 { font-size: 1.75rem; }
+  table.stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  table.stack tr { display: grid; gap: 4px; padding: 11px 14px; border-bottom: 1px solid var(--rule); }
+  table.stack tbody tr:last-child { border-bottom: 0; }
+  table.stack td { display: block; padding: 0; border: 0; }
+  table.stack td:first-child { font-weight: 600; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <header class="mast">
+    <span class="kicker">EEE3035 · Group 8 · Active Solar Tracker · data link (AM) · contract v1.5</span>
+    <h1>Active Solar Tracker data link</h1>
+    <p class="lede">Every minute the tracker logs the power of the tracked panel, the fixed panel and its own electronics. Every 15 minutes it uploads to ThingSpeak, every night MATLAB summarises each day, and the phone dashboard shows all of it live.</p>
+    <div class="actions">
+      <a class="btn primary" href="dashboard/">Open the live dashboard</a>
+      <a class="btn" href="dashboard/?demo=1">Demo with simulated data</a>
+      <a class="btn" href="https://github.com/amr-coding1/eee3035-active-solar-tracker">Code and docs on GitHub</a>
+    </div>
+    <div class="chips" aria-label="State on 13 Nov 2026">
+      <span class="chip pass">Cloud side live</span>
+      <span class="chip pass">129 of 129 end-to-end checks</span>
+      <span class="chip wait">Waiting for hardware</span>
+      <span class="chip risk">Net-gain definition to agree</span>
+    </div>
+  </header>
+
+  <section aria-labelledby="how">
+    <h2 id="how">How it works</h2>
+    <ol class="flow">
+      <li><strong>Measure</strong><span class="what">3× INA226: tracked panel, fixed panel, tracker's own use. Angles and state from the control system. Once a second.</span></li>
+      <li><strong>Log</strong><span class="what">Arduino Nano ESP32 averages each UTC minute and keeps 8 days in flash, so Wi-Fi drops lose nothing.</span></li>
+      <li><strong>Upload</strong><span class="what">HTTPS bulk upload to ThingSpeak channel <a href="https://thingspeak.mathworks.com/channels/3578277">3578277</a> every 15 min.</span></li>
+      <li><strong>Analyse</strong><span class="what">MATLAB on ThingSpeak, 00:20 UTC nightly: energy, gross and net gain, pointing error, completeness into channel <a href="https://thingspeak.mathworks.com/channels/3578278">3578278</a>.</span></li>
+      <li><strong>Show</strong><span class="what">Phone dashboard: live figures, charts, daily and per-run tables, CSV export, and a MATLAB check on every day.</span></li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="teams">
+    <h2 id="teams">What each subsystem plugs in</h2>
+    <div class="table-wrap">
+      <table class="stack">
+        <thead><tr><th scope="col">Subsystem</th><th scope="col">What the data link needs</th><th scope="col">Where</th></tr></thead>
+        <tbody>
+          <tr><td>Control system</td><td>Call <code>telemetry_set_angles</code>, <code>telemetry_set_state</code>, <code>telemetry_set_motor_running</code> and <code>telemetry_set_fault</code> once a second. Everything else (powers, clock, storage, upload) is already handled.</td><td><a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/blob/main/firmware/INTERFACE.md">INTERFACE.md</a></td></tr>
+          <tr><td>Power system</td><td>The three shunt values (default 0.1 Ω), all modules on 3V3 (no Nano ESP32 pin takes 5 V), INA226 at I2C 0x40 tracked, 0x41 fixed, 0x44 battery line.</td><td><a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/blob/main/firmware/README.md#wiring">Wiring</a></td></tr>
+          <tr><td>Sun sensing</td><td>Sun angle on the tracking axis (east negative, west positive), passed through the control system.</td><td><a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/blob/main/firmware/INTERFACE.md">INTERFACE.md</a></td></tr>
+          <tr><td>Mechanical and testing</td><td>Fixed panel at the tracker's tilt. Before a test type <code>run 12</code> and <code>panel A</code> on the serial console; calibration runs are 900–999.</td><td><a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/blob/main/docs/VV_RESULTS.md">Bench procedures</a></td></tr>
+          <tr><td>Report writers</td><td>V&amp;V tables, decision matrix, energy budget, DMP, FMEA, AI-log entry and figures, ready to cite.</td><td><a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/tree/main/docs">docs/</a> · <a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/tree/main/analysis/figures">figures</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="key">
+    <h2 id="key">The decision the headline result depends on</h2>
+    <div class="key">
+      <p><strong>In November, tracking gains about as much energy as the electronics use.</strong> PVGIS for Guildford with the 5.4 W panel: an inclined-axis tracker beats a fixed panel at the same tilt by about 1.5 Wh a day; a flat tracker beats a flat fixed panel by about 2.5 Wh. The data-link firmware is estimated at 2.3 Wh a day, and an ESP32 left awake uses about 4.8.</p>
+      <p>Agree before the first outdoor run: the fixed reference panel sits at the tracker's tilt, and which loads count as the tracker's own use (<code>P_use</code>) in the net gain.</p>
+    </div>
+    <figure>
+      <svg viewBox="0 0 420 290" role="img" aria-labelledby="chart-title chart-desc" class="chart">
+        <title id="chart-title">November: tracking gain versus electronics use, Wh per day</title>
+        <desc id="chart-desc">Gain of an inclined-axis tracker over a fixed panel at the same tilt 1.46; gain of a flat tracker over a flat fixed panel 2.48; data-link firmware estimate 2.3; ESP32 left awake 4.8; light-sleep target 0.24.</desc>
+        <g font-size="13">
+          <g stroke="var(--rule)" stroke-width="1">
+            <line x1="10" y1="26" x2="10" y2="262"/><line x1="86" y1="26" x2="86" y2="262"/><line x1="162" y1="26" x2="162" y2="262"/>
+            <line x1="238" y1="26" x2="238" y2="262"/><line x1="314" y1="26" x2="314" y2="262"/><line x1="390" y1="26" x2="390" y2="262"/>
+          </g>
+          <g fill="var(--muted)" font-size="12" text-anchor="middle">
+            <text x="14" y="280">0</text><text x="86" y="280">1</text><text x="162" y="280">2</text><text x="238" y="280">3</text><text x="314" y="280">4</text><text x="390" y="280">5</text>
+          </g>
+          <text x="10" y="20" fill="var(--ink)">Gain: inclined tracker vs fixed at same tilt</text>
+          <rect x="10" y="28" width="110.8" height="20" rx="3" fill="var(--gain)"/>
+          <text x="126.8" y="43" fill="var(--ink)">1.46</text>
+          <text x="10" y="72" fill="var(--ink)">Gain: flat tracker vs flat fixed panel</text>
+          <rect x="10" y="80" width="188.8" height="20" rx="3" fill="var(--gain)"/>
+          <text x="204.8" y="95" fill="var(--ink)">2.48</text>
+          <text x="10" y="124" fill="var(--ink)">Use: data-link firmware (estimate)</text>
+          <rect x="10" y="132" width="174.8" height="20" rx="3" fill="var(--use)"/>
+          <text x="190.8" y="147" fill="var(--ink)">≈ 2.3</text>
+          <text x="10" y="176" fill="var(--ink)">Use: ESP32 left awake</text>
+          <rect x="10" y="184" width="364.8" height="20" rx="3" fill="var(--use)"/>
+          <text x="368.8" y="199" text-anchor="end" fill="var(--sheet)">4.8</text>
+          <text x="10" y="228" fill="var(--ink)">Use: light-sleep target</text>
+          <rect x="10" y="236" width="18.1" height="20" rx="3" fill="var(--use)"/>
+          <text x="34.1" y="251" fill="var(--ink)">0.24</text>
+        </g>
+      </svg>
+      <figcaption>Wh per day. Gains: PVGIS 5.3, Guildford (51.243 N, 0.589 W), 5.4 W panel, 14 % system loss, November daily mean. Uses: firmware energy budget from datasheet currents, not yet measured; the INA226 on the battery line will measure the real figure.</figcaption>
+    </figure>
+  </section>
+
+  <section aria-labelledby="evidence">
+    <h2 id="evidence">Test evidence (13 Nov 2026)</h2>
+    <div class="table-wrap">
+      <table class="stack">
+        <thead><tr><th scope="col">Check</th><th scope="col">What it shows</th><th scope="col">Result</th></tr></thead>
+        <tbody>
+          <tr><td>End to end, S1–S12</td><td>Real firmware core, real MATLAB script (in GNU Octave) and the real dashboard in Chrome, in virtual time: outages up to 7.5 days, reboot, lost responses, late data corrected, two phones agree, CSV equals the device log, sample to screen within 17 min</td><td class="num"><span class="chip pass">129 / 129</span></td></tr>
+          <tr><td>Firmware</td><td>195 unit tests under sanitizers, thread-sanitizer test; Nano ESP32 build with 0 warnings</td><td class="num"><span class="chip pass">pass</span></td></tr>
+          <tr><td>MATLAB on ThingSpeak</td><td>Nightly job on the real service: 9 daily rows identical to the independent Python reference</td><td class="num"><span class="chip pass">identical</span></td></tr>
+          <tr><td>Dashboard</td><td>41 tests incl. WCAG 2.2 AA (axe-core, light and dark), a 320 px phone, colour-blind-safe charts with data tables</td><td class="num"><span class="chip pass">41 / 41</span></td></tr>
+          <tr><td>Independent review</td><td>A separate AI agent checked correctness, security and documentation; 3 medium and 7 low findings, all fixed and re-tested</td><td class="num"><span class="chip pass">10 / 10</span></td></tr>
+          <tr><td>Hardware</td><td>Wi-Fi, TLS, clock, sensors, current draw: bench procedures B1–B4</td><td class="num"><span class="chip wait">when parts arrive</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="links">
+    <h2 id="links">Links</h2>
+    <ul class="plain">
+      <li><a href="dashboard/">Live dashboard</a> (add it to your phone's home screen) · <a href="dashboard/?demo=1">demo</a></li>
+      <li>ThingSpeak: <a href="https://thingspeak.mathworks.com/channels/3578277">raw samples 3578277</a> · <a href="https://thingspeak.mathworks.com/channels/3578278">daily results 3578278</a></li>
+      <li>MATLAB charts: <a href="https://thingspeak.mathworks.com/apps/matlab_visualizations/689480">power</a> · <a href="https://thingspeak.mathworks.com/apps/matlab_visualizations/689481">energy</a> · <a href="https://thingspeak.mathworks.com/apps/matlab_visualizations/689485">daily net gain</a> · <a href="https://thingspeak.mathworks.com/apps/matlab_visualizations/689483">angles</a> · <a href="https://thingspeak.mathworks.com/apps/matlab_visualizations/689484">status</a></li>
+      <li>Specification: <a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/blob/main/docs/CONTRACT.md">data contract v1.5</a> · Set-up: <a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/blob/main/docs/SETUP.md">SETUP.md</a> · Results: <a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/blob/main/docs/VV_RESULTS.md">VV_RESULTS.md</a></li>
+      <li>Group workspace: <a href="https://fishy-canoe-485.notion.site/EPS-YR3SEM1-3ebf4629be36801c8fabcd4547e0255c">Notion</a></li>
+    </ul>
+  </section>
+
+  <footer class="foot">
+    <span>EEE3035 Engineering Professional Studies, University of Surrey, 2026/27. Data link by AM; built with AI assistance (Anthropic Claude), declared in the group AI log with every verification step.</span>
+    <span>Measurement data are non-personal and public. The write keys are never in this repository.</span>
+  </footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Active Solar Tracker – live data</title>
+  <meta name="description" content="Phone dashboard for the EEE3035 Group 8 Active Solar Tracker: power, angle, daily energy and net gain against a fixed panel.">
+  <meta name="theme-color" content="#0b4f79">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-state="loading">
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <header class="site-header">
+    <div class="wrap header-row">
+      <div>
+        <h1>Active Solar Tracker</h1>
+        <p class="tagline">Tracked panel against an identical fixed panel · Group 8, EEE3035</p>
+      </div>
+      <p id="demo-badge" class="badge" hidden><span aria-hidden="true">◆</span> Demo data (simulated)</p>
+    </div>
+  </header>
+
+  <main id="main" class="wrap" tabindex="-1">
+
+    <section id="status" aria-labelledby="status-h" class="card status">
+      <h2 id="status-h">Tracker status</h2>
+      <p id="freshness" class="freshness" data-fresh="unknown">
+        <span class="fresh-icon" aria-hidden="true">…</span>
+        <span id="freshness-text">Loading the latest sample…</span>
+      </p>
+      <dl class="status-grid">
+        <div class="wide"><dt>Last sample</dt><dd id="st-age">–</dd></div>
+        <div><dt>State</dt><dd id="st-state">–</dd></div>
+        <div><dt>Fault</dt><dd id="st-fault">–</dd></div>
+        <div><dt>Test run</dt><dd id="st-run">–</dd></div>
+        <div><dt>Panel on tracker</dt><dd id="st-panel">–</dd></div>
+        <div><dt>Data</dt><dd id="st-data">–</dd></div>
+        <div class="wide"><dt>Power now</dt><dd id="st-power">–</dd></div>
+        <div class="wide"><dt>Angle now</dt><dd id="st-angle">–</dd></div>
+      </dl>
+    </section>
+
+    <div id="messages" role="alert" aria-atomic="true"></div>
+
+    <section id="day" aria-labelledby="day-h" class="card">
+      <h2 id="day-h">Day</h2>
+      <div class="day-picker">
+        <button type="button" id="day-prev" class="btn"><span aria-hidden="true">◀</span> Previous<span class="visually-hidden"> day</span></button>
+        <div class="day-field">
+          <label for="day-input">Day (UTC)</label>
+          <input type="date" id="day-input" name="day">
+        </div>
+        <button type="button" id="day-next" class="btn">Next<span class="visually-hidden"> day</span> <span aria-hidden="true">▶</span></button>
+        <button type="button" id="day-today" class="btn">Today</button>
+      </div>
+      <p id="summary" class="summary">Loading…</p>
+      <p id="summary-live" class="visually-hidden" aria-live="polite" aria-atomic="true"></p>
+      <p class="hint">Days run from 00:00 to 24:00 UTC, as on the device. Clock times are shown in UK time (Europe/London).</p>
+    </section>
+
+    <section id="kpis" aria-labelledby="kpi-h">
+      <h2 id="kpi-h">Key figures for <span id="kpi-day">the day</span></h2>
+      <dl class="kpi-grid">
+        <div class="kpi" data-kpi="eTrk"><dt><span class="key key-trk" aria-hidden="true"></span>Tracked panel energy</dt><dd><span class="kpi-value">–</span> <span class="unit">Wh</span></dd></div>
+        <div class="kpi" data-kpi="eFix"><dt><span class="key key-fix" aria-hidden="true"></span>Fixed panel energy</dt><dd><span class="kpi-value">–</span> <span class="unit">Wh</span></dd></div>
+        <div class="kpi" data-kpi="eUse"><dt><span class="key key-use" aria-hidden="true"></span>Tracker's own use</dt><dd><span class="kpi-value">–</span> <span class="unit">Wh</span></dd></div>
+        <div class="kpi" data-kpi="gGross"><dt>Gross gain</dt><dd><span class="kpi-value">–</span> <span class="unit">%</span></dd><dd class="kpi-note">–</dd></div>
+        <div class="kpi kpi-main" data-kpi="gNet"><dt>Net gain <span class="dt-sub">(after own use)</span></dt><dd><span class="kpi-value">–</span> <span class="unit">%</span></dd><dd class="kpi-note">–</dd></div>
+        <div class="kpi" data-kpi="complete"><dt>Data completeness</dt><dd><span class="kpi-value">–</span> <span class="unit">%</span></dd><dd class="kpi-note">–</dd></div>
+        <div class="kpi" data-kpi="moves"><dt>Tracker moves</dt><dd><span class="kpi-value">–</span></dd><dd class="kpi-note">minutes in which the motor ran</dd></div>
+        <div class="kpi" data-kpi="mae"><dt>Mean pointing error</dt><dd><span class="kpi-value">–</span> <span class="unit">°</span></dd><dd class="kpi-note">–</dd></div>
+      </dl>
+      <ul id="quality" class="quality" aria-label="Data quality notes"></ul>
+    </section>
+
+    <section id="charts" aria-labelledby="charts-h">
+      <h2 id="charts-h">Charts</h2>
+
+      <figure class="card chart" id="fig-power">
+        <figcaption><strong>Power through the day.</strong> One-minute mean power of the tracked panel, the fixed panel and the tracker's own consumption, in milliwatts.</figcaption>
+        <ul class="legend" aria-label="Lines in this chart"></ul>
+        <div class="canvas-box"><canvas role="img" aria-label="Line chart of power through the day">Chart of power through the day. Use “Show data table” below for the numbers.</canvas></div>
+        <details class="data-table"><summary>Show data table</summary><div class="table-scroll" tabindex="0" role="region" aria-label="Power data table"></div></details>
+      </figure>
+
+      <figure class="card chart" id="fig-energy">
+        <figcaption><strong>Energy collected so far.</strong> Running total in watt-hours for the tracked panel, the fixed panel, and the tracked panel after subtracting the tracker's own use.</figcaption>
+        <ul class="legend" aria-label="Lines in this chart"></ul>
+        <div class="canvas-box"><canvas role="img" aria-label="Line chart of cumulative energy">Chart of cumulative energy. Use “Show data table” below for the numbers.</canvas></div>
+        <details class="data-table"><summary>Show data table</summary><div class="table-scroll" tabindex="0" role="region" aria-label="Cumulative energy data table"></div></details>
+      </figure>
+
+      <figure class="card chart" id="fig-gain">
+        <figcaption><strong>Net gain as the day goes on.</strong> Running net gain in percent: energy from the tracked panel, minus the fixed panel, minus the tracker's own use, as a share of the fixed panel. Above the zero line the tracker is ahead. The first minutes after sunrise, when almost no energy has been collected, can be off the scale.</figcaption>
+        <ul class="legend" aria-label="Lines in this chart"></ul>
+        <div class="canvas-box"><canvas role="img" aria-label="Line chart of running net gain">Chart of running net gain. Use “Show data table” below for the numbers.</canvas></div>
+        <details class="data-table"><summary>Show data table</summary><div class="table-scroll" tabindex="0" role="region" aria-label="Running net gain data table"></div></details>
+      </figure>
+
+      <figure class="card chart" id="fig-angle">
+        <figcaption><strong>Panel angle and sun angle.</strong> Degrees about the tracking axis: negative is east (morning), positive is west (afternoon). The closer the two lines, the better the pointing.</figcaption>
+        <ul class="legend" aria-label="Lines in this chart"></ul>
+        <div class="canvas-box"><canvas role="img" aria-label="Line chart of panel angle and sun angle">Chart of panel and sun angle. Use “Show data table” below for the numbers.</canvas></div>
+        <details class="data-table"><summary>Show data table</summary><div class="table-scroll" tabindex="0" role="region" aria-label="Angle data table"></div></details>
+      </figure>
+
+      <figure class="card chart" id="fig-status">
+        <figcaption><strong>Status through the day.</strong> What the tracker was doing, minute by minute: one row per state (tracking, moving, holding, idle, stowed, fault) and a hatched row for minutes with no data. Read across a row to see when that state happened.</figcaption>
+        <div class="canvas-box canvas-box-timeline"><canvas role="img" aria-label="Status timeline chart">Status timeline. Use “Show data table” below for the periods.</canvas></div>
+        <details class="data-table"><summary>Show data table</summary><div class="table-scroll" tabindex="0" role="region" aria-label="Status periods data table"></div></details>
+      </figure>
+
+      <figure class="card chart" id="fig-hist">
+        <figcaption><strong>Pointing error histogram.</strong> Number of one-minute samples in each 1° band of pointing error (sun angle minus panel angle) while tracking, moving or holding. The end bars count errors below −30° and of 30° or more.</figcaption>
+        <div class="canvas-box"><canvas role="img" aria-label="Bar chart of pointing error">Histogram of pointing error. Use “Show data table” below for the numbers.</canvas></div>
+        <details class="data-table"><summary>Show data table</summary><div class="table-scroll" tabindex="0" role="region" aria-label="Pointing error histogram data table"></div></details>
+      </figure>
+
+      <figure class="card chart" id="fig-daily-gain">
+        <figcaption><strong>Net gain per day.</strong> One bar for each UTC day in the loaded range: that day's net gain in percent (tracked panel, minus fixed panel, minus the tracker's own use, as a share of the fixed panel). Worked out on this device from the raw samples. Bars above the zero line are a gain; bars below it are a loss. Today's bar covers the day so far; a day with no fixed-panel energy has no bar.</figcaption>
+        <ul class="legend" aria-label="Bars in this chart"></ul>
+        <div class="canvas-box"><canvas role="img" aria-label="Bar chart of net gain per day">Chart of net gain per day. Use “Show data table” below for the numbers.</canvas></div>
+        <details class="data-table"><summary>Show data table</summary><div class="table-scroll" tabindex="0" role="region" aria-label="Net gain per day data table"></div></details>
+      </figure>
+    </section>
+
+    <section id="matlab" aria-labelledby="matlab-h" class="card" hidden>
+      <h2 id="matlab-h">MATLAB charts (ThingSpeak)</h2>
+      <p class="hint">Drawn by MATLAB Visualizations on ThingSpeak from the same two channels: microcontroller → ThingSpeak → MATLAB → charts embedded here. They are an independent second view; the charts and tables above are worked out on this device from the raw samples. MATLAB charts follow ThingSpeak's own refresh and may lag by a few minutes.</p>
+      <div id="matlab-grid" class="matlab-grid"></div>
+    </section>
+
+    <section id="daily" aria-labelledby="daily-h" class="card">
+      <h2 id="daily-h">Daily summary</h2>
+      <p id="daily-source" class="hint"></p>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Daily summary table">
+        <table id="daily-table">
+          <thead><tr>
+            <th scope="col">Period</th><th scope="col">Tracked Wh</th><th scope="col">Fixed Wh</th><th scope="col">Own use Wh</th>
+            <th scope="col">Gross gain %</th><th scope="col">Net gain %</th><th scope="col">Pointing error °</th><th scope="col">Complete %</th><th scope="col">Samples</th>
+            <th scope="col">MATLAB check</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="runs" aria-labelledby="runs-h" class="card">
+      <h2 id="runs-h">Test runs</h2>
+      <p id="runs-note" class="hint"></p>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Test runs table">
+        <table id="runs-table">
+          <thead><tr>
+            <th scope="col">Run</th><th scope="col">Type</th><th scope="col">Panel on tracker</th><th scope="col">Start (UK)</th><th scope="col">Length</th>
+            <th scope="col">Tracked Wh</th><th scope="col">Fixed Wh</th><th scope="col">Own use Wh</th>
+            <th scope="col">Gross gain %</th><th scope="col">Net gain %</th><th scope="col">Samples</th>
+            <th scope="col">Pointing error °</th><th scope="col">Complete %</th><th scope="col">Moves</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p id="calib-note" hidden></p>
+      <h3 id="panels-h">Panel A against panel B</h3>
+      <p class="hint">Totals over the tracking tests above (run numbers 1 to 899), grouped by which panel was on the tracker. Calibration runs are left out. Similar net gains for A and B mean the gain comes from tracking, not from one panel being better.</p>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Panel A against panel B table">
+        <table id="panels-table">
+          <thead><tr>
+            <th scope="col">Panel on tracker</th><th scope="col">Runs</th><th scope="col">Samples</th><th scope="col">Tracked Wh</th>
+            <th scope="col">Fixed Wh</th><th scope="col">Own use Wh</th><th scope="col">Gross gain %</th><th scope="col">Net gain %</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="export" aria-labelledby="export-h" class="card">
+      <h2 id="export-h">Export data (CSV)</h2>
+      <p id="export-range" class="hint"></p>
+      <ul class="export-list">
+        <li><button type="button" class="btn" id="csv-raw"><span aria-hidden="true">⬇</span> Raw samples</button><span id="csv-raw-info" class="hint"></span></li>
+        <li><button type="button" class="btn" id="csv-runs"><span aria-hidden="true">⬇</span> Per-run summary</button><span id="csv-runs-info" class="hint"></span></li>
+        <li><button type="button" class="btn" id="csv-hist"><span aria-hidden="true">⬇</span> Pointing-error histogram</button><span id="csv-hist-info" class="hint"></span></li>
+        <li><button type="button" class="btn" id="csv-energy"><span aria-hidden="true">⬇</span> Energy budget per day</button><span id="csv-energy-info" class="hint"></span></li>
+      </ul>
+      <p id="export-status" class="export-status" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p id="refresh-info">Not loaded yet.</p>
+      <p><button type="button" class="btn btn-small" id="refresh-now">Refresh now</button></p>
+      <p id="saved-config" hidden><span id="saved-config-info" class="hint"></span> <button type="button" class="btn btn-small" id="forget-config">Forget saved channel settings</button></p>
+      <p id="saved-config-status" class="hint" role="status"></p>
+      <p class="hint">Metrics follow the AST data-link contract, section 6 (v1.5). Read-only view: this page cannot change the tracker.</p>
+    </div>
+  </footer>
+
+  <script src="vendor/chart.umd.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
