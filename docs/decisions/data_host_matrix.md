@@ -33,3 +33,5 @@ Ranking: 1. ThingSpeak (4.55), 2. Supabase (3.80), 3. Firebase RTDB (3.30), 4. A
 ## Consequence for the design
 
 ThingSpeak is chosen; Supabase (the 27 Oct DMP draft) is replaced. The DMP is updated (docs/DMP_v2.md). Main ThingSpeak weakness: US hosting and no automatic backup -> mitigated by weekly CSV export to the group OneDrive and the device's 8-day buffer.
+
+**University enterprise offering (design-brief feedback, comment 18).** The marker asked whether the proof of concept could run on the University's enterprise offering instead of Supabase. It does: ThingSpeak and MATLAB come with the University of Surrey's MathWorks Campus-Wide licence (Total Academic Headcount), used here through a @surrey.ac.uk account, and the backups go to the University's Microsoft 365 OneDrive. No service outside the University's own licences holds measured data.

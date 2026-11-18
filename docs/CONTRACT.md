@@ -44,7 +44,7 @@ read, MATLAB code must finish within 20 s, TimeControl no faster than every
 |---|---|---|---|---|
 | field1 | P_trk | mW | 1 dp | mean output power of the TRACKED panel over the minute |
 | field2 | P_fix | mW | 1 dp | mean output power of the FIXED panel over the minute |
-| field3 | P_use | mW | 1 dp | mean power drawn by the tracker itself (MCU, sensors, driver, motor) |
+| field3 | P_use | mW | 1 dp | mean power drawn by the tracker itself: everything it draws (MCU with Wi-Fi, sensors, driver, motor), so INA226 0x44 sits on the whole tracker supply line (scope confirmed by Lem, 17 Nov 2026) |
 | field4 | θ_panel | ° | 1 dp | panel angle about the tracking axis at the end of the minute; 0 = level, east negative, west positive |
 | field5 | θ_sun | ° | 1 dp | sun angle from the sensor arc on the same axis; OMITTED when unknown (dark, cloud, fault) |
 | field6 | T_panel | °C | 1 dp | panel temperature; OMITTED when no sensor fitted (SHOULD requirement F6) |
@@ -277,6 +277,9 @@ clock (see the file header).
   <= 17 min.
 
 ## 12. Change log
+- v1.5 note (18 Nov 2026, no field meaning changed, still `v=1.5`): field3 P_use is
+  confirmed as everything the tracker draws (Lem, 17 Nov), so net gain in 6.2 already
+  counts the MCU, Wi-Fi, sensors, driver and motor.
 - v1.5 amendment (13 Nov 2026, wire format unchanged, still `v=1.5`): 7.3 TLS
   uses the core CA bundle (optional pinned root); poison-batch bisection with a
   3-record drop limit; strictly increasing timestamps; 401/403/404 keep data;

@@ -41,11 +41,20 @@ PVGIS data are referenced, not copied. Code and data are our own work under Univ
 regulations; library licences are listed in the README; AI use is declared in the AI log.
 
 ## 4. Storage and backup
+**University enterprise offering (design-brief feedback).** Every service holding measured data is
+provided through the University: ThingSpeak and MATLAB (analysis, charts, report figures) run under
+the University's MathWorks Campus-Wide licence on a @surrey.ac.uk account (MathWorks: a school with a
+Campus-Wide licence can use the Free ThingSpeak licence for non-commercial work,
+https://www.mathworks.com/matlabcentral/answers/754094), and backups and the final archive sit in
+the University's Microsoft 365 (OneDrive). Our load is about 18 % of the free allowance, so a paid
+academic ThingSpeak licence is not needed. The Supabase plan of the design brief was dropped; GitHub
+holds code, documents and simulated test samples only, never measured data or keys.
+
 | Copy | Where | Role |
 |---|---|---|
 | Device flash | ESP32 LittleFS ring buffer, 8 days | primary until uploaded; survives outages (F7) |
-| ThingSpeak ch1 3578277 / ch2 3578278 | MathWorks cloud (free licence), HTTPS | working copy; public-read, write needs the channel key |
-| University OneDrive (group folder) | weekly CSV export from the dashboard (4 files) | backup: ThingSpeak's free licence has no backup |
+| ThingSpeak ch1 3578277 / ch2 3578278 | MathWorks cloud, HTTPS; the free ThingSpeak tier that comes with the University of Surrey's MathWorks Campus-Wide (Total Academic Headcount) licence, on AM's university account | working copy; public-read, write needs the channel key |
+| University OneDrive (Surrey365, 250 GB per student; group folder shared from AM's account) | weekly CSV export from the dashboard (4 files) | backup: ThingSpeak's free licence has no backup; Surrey IT asks for University-provided storage for University work |
 | GitHub repository | code, contract, docs | version control (no keys) |
 
 **Access and security.** Writes need the channel write key (device and MATLAB job only);
