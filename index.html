@@ -133,10 +133,11 @@ ul.plain { margin: 0; padding-left: 1.2rem; display: grid; gap: 6px; }
   </section>
 
   <section aria-labelledby="key">
-    <h2 id="key">The decision the headline result depends on</h2>
+    <h2 id="key">What the headline result depends on</h2>
     <div class="key">
       <p><strong>In November, tracking gains about as much energy as the electronics use.</strong> PVGIS for Guildford with the 5.4 W panel: an inclined-axis tracker beats a fixed panel at the same tilt by about 1.5 Wh a day; a flat tracker beats a flat fixed panel by about 2.5 Wh. The data-link firmware is estimated at 2.3 Wh a day, and an ESP32 left awake uses about 4.8.</p>
-      <p>Agree before the first outdoor run: the fixed reference panel sits at the tracker's tilt, and which loads count as the tracker's own use (<code>P_use</code>) in the net gain.</p>
+      <p><strong>Decided 17 Nov (Lem): <code>P_use</code> is everything the tracker draws</strong> (MCU with Wi-Fi, sensors, driver, motor). Over a year the PVGIS model gives +29 % gross and +14 % net of the data link, but a net loss from November to February (Nov &minus;10 %, Dec &minus;27 %, before the motor), so the lab runs will probably show a loss. Report gross and net month by month: <a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/blob/main/docs/figures/net_gain_by_month.png">figure</a> and <a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/blob/main/docs/energy/net_gain_by_month.md">table</a>. Light sleep between samples would keep every month positive.</p>
+      <p>Still to confirm before the first outdoor run: the fixed reference panel sits at the tracker's tilt.</p>
     </div>
     <figure>
       <svg viewBox="0 0 420 290" role="img" aria-labelledby="chart-title chart-desc" class="chart">

@@ -39,7 +39,8 @@ responses, verification, adaptation) — REQUIRED and "monitored strictly".
    report shows gross and net month by month (answers comments 9, 15 and 19 below).
    A board left fully awake (~4.8 Wh/day) loses over the whole year (-2 %); light sleep
    between samples (~0.24 Wh/day) gives +28 %/year and a gain in every month. The
-   motor adds on top: measure it on the bench (INA226 #3 or DMM).
+   motor adds on top: measure it on the bench (INA226 #3 or DMM). Figure and table ready:
+   docs/figures/net_gain_by_month.png, docs/energy/net_gain_by_month.md.
 3. **Indoor lamp tests prove the mechanism, not the yield.** Use PVGIS for the outdoor
    yield argument (validation), lamp runs for F1-F3 verification.
 4. **Control: worked out during testing (Lem, 17 Nov).** The control code is simple;

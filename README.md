@@ -26,14 +26,20 @@ V&V documentation for both (requirements F7, F8, F9; supports F10 and F11).
 | Mechanical and testing | Fixed panel at the tracker's tilt. Before each test type `run <n>` and `panel A` on the serial console (115200 baud); calibration runs are 900-999. | [`docs/VV_RESULTS.md`](docs/VV_RESULTS.md) |
 | Report writers | V&V tables, decision matrix, energy budget, DMP v2, SMART objectives and FMEA, AI-log entry, figures. | [`docs/`](docs/), [`analysis/figures/`](analysis/figures/), [`docs/figures/`](docs/figures/) |
 
-## The decision the headline result depends on
+## What the headline result depends on
 
 PVGIS for Guildford, 5.4 W panel, November: tracking gains about 1.5 Wh/day (inclined axis vs a
 fixed panel at the same tilt) to 2.5 Wh/day (flat vs flat). The data-link firmware is estimated at
-2.3 Wh/day; an ESP32 left awake uses about 4.8 Wh/day. The group must agree that the fixed
-reference panel sits at the tracker's tilt, and which loads count as the tracker's own use
-(`P_use`) in the net gain. Numbers: [`docs/energy/`](docs/energy/), figure
-[`docs/figures/energy_budget_pvgis.png`](docs/figures/energy_budget_pvgis.png).
+2.3 Wh/day; an ESP32 left awake uses about 4.8 Wh/day.
+
+**Decided 17 Nov (Lem): `P_use` is everything the tracker draws** (MCU with Wi-Fi, sensors, driver,
+motor). Over a year that gives +29 % gross and +14 % net of the data link, but a net loss from
+November to February (Nov -10 %, Dec -27 %, before the motor), so the lab runs will probably show
+a loss: report gross and net month by month. Light sleep between samples would keep every month
+positive. Still to confirm: the fixed reference panel sits at the tracker's tilt.
+Figures: [`docs/figures/net_gain_by_month.png`](docs/figures/net_gain_by_month.png),
+[`docs/figures/energy_budget_pvgis.png`](docs/figures/energy_budget_pvgis.png); table:
+[`docs/energy/net_gain_by_month.md`](docs/energy/net_gain_by_month.md).
 
 ## Live on ThingSpeak
 
