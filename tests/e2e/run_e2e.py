@@ -1022,7 +1022,7 @@ def s10(h):
                     first_diff = first_diff or "entry %s not on the server" % r[col["entry_id"]]
                     continue
                 pairs = [("seq", e["seq"]), ("p_trk_mw", e["p_trk"]), ("p_fix_mw", e["p_fix"]), ("p_use_mw", e["p_use"]),
-                         ("ang_panel_deg", e["ang_panel"]), ("ang_sun_deg", e["ang_sun"]), ("temp_c", e["temp"]), ("vbat_v", e["vbat"])]
+                         ("ang_panel_deg", e["ang_panel"]), ("ang_sun_deg", e["ang_sun"]), ("temp_c", e["temp"]), ("v_supply_v", e["v_supply"])]
                 okrow = r[col["created_at_utc"]] == e["row"]["created_at"] and r[col["status"]] == (e["status"] or "")
                 for name, v in pairs:
                     cell = r[col[name]]
@@ -1035,7 +1035,7 @@ def s10(h):
                 header == want_header and len(body) == len(entries) and diffs == 0, ("F9",))
         samples = {ev["seq"]: ev["entry"] for ev in h.device_events("sample") if "seq" in ev and isinstance(ev.get("entry"), dict)}
         if samples and header == want_header:
-            names = ["p_trk_mw", "p_fix_mw", "p_use_mw", "ang_panel_deg", "ang_sun_deg", "temp_c", "vbat_v"]
+            names = ["p_trk_mw", "p_fix_mw", "p_use_mw", "ang_panel_deg", "ang_sun_deg", "temp_c", "v_supply_v"]
             d2 = 0
             first_d2 = ""
             for r in body:
@@ -1273,7 +1273,7 @@ Pass: 12 of 12 uploads 15 min +/- 30 s apart; 60 entries per hour (>= 99 %); eve
 Pass: 0 missing sequence numbers; back-fill finished within 16 min of reconnection (6 h case); serial log shows no HTTP 429.
 
 **B3 - DMM calibration check and clock check (measurement validity for F7-F9; F7: timestamps within 2 s).**
-1. Run `cal` (two-point INA226 calibration) for each of the three power channels against the bench DMM and a bench supply/load.
+1. Run `cal` (two-point calibration of the power sensors, INA226 or INA219, auto-detected) for each of the three power channels against the bench DMM and a bench supply/load.
 2. Then apply five loads across the range (for example 0.1, 0.5, 1, 3, 5 W) and write down DMM power and the 60 s mean reported on the dashboard.
 3. Clock: with NTP reachable, type `time` on the serial CLI next to a phone showing time.is; then unplug Wi-Fi for 24 h (RTC free-running) and repeat.
 4. Remove the RTC battery with the board off, power on without Wi-Fi: `status` must show fault 4 and no samples are logged; enable the hotspot: logging starts within 2 min.

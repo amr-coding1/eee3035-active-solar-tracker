@@ -11,7 +11,7 @@ No build step, no server code, no keys: plain HTML, CSS and ES modules plus Char
 ## What it shows
 
 - Today's (or a chosen UTC day's) energy of the tracked and the fixed panel, own use, gross and net
-  gain, completeness, motor moves and mean pointing error, with data-age and data-quality notes.
+  gain, completeness, servo moves and mean pointing error, with data-age and data-quality notes.
 - Charts: power, cumulative energy, running gain, panel and sun angle, status timeline, pointing-error
   histogram, net gain per day. Every chart has a "Show data table" text alternative.
 - Daily table for the last 14 days with a "MATLAB check" column: agrees / differs / not yet

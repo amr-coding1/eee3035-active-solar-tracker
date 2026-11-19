@@ -9,15 +9,15 @@ PROJECT TITLE: Active Solar Tracker — Group 8, EEE3035 (2026/27)
 
 ## 1. Data collection
 **What data?** Once a minute (UTC): tracked-panel, fixed-panel and tracker-own-use power
-(mW), panel angle and sun angle (°), panel temperature (°C, if fitted), battery voltage (V),
+(mW), panel angle and sun angle (°), panel temperature (°C, if fitted), supply voltage (V),
 sample sequence number, and a status string (state, test-run number, panel letter, fault
 code, simulated flag). Derived nightly by MATLAB: daily energy (Wh), gross and net gain (%),
 mean pointing error (°), completeness (%). Also calibration records, V&V test logs (F1-F12),
 photos/videos, CAD, code, minutes and the AI log.
 Volume: ~1,440 entries/day; ~0.2 MB/day as CSV; ~15 MB over the test period; media/CAD a few GB.
 
-**How?** Three INA226 power monitors and the control system's angle/sun sensors feed an
-Arduino Nano ESP32. Each one-minute record is time-stamped from a DS3231 RTC (UTC, set by
+**How?** Three power monitors (INA226 or INA219, auto-detected) and the control system's
+angle/sun sensors feed an Arduino Nano ESP32. Each one-minute record is time-stamped from a DS3231 RTC (UTC, set by
 NTP), stored in on-board flash (8-day ring buffer), and uploaded over HTTPS to ThingSpeak
 every 15 minutes in bulk. Sensors are calibrated against the bench DMM before testing (CLI
 `cal`); calibration constants are stored on the device and recorded in the test log.

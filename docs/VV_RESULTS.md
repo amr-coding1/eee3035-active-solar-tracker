@@ -59,7 +59,7 @@ Pass: 12 of 12 uploads 15 min +/- 30 s apart; 60 entries per hour (>= 99 %); eve
 Pass: 0 missing sequence numbers; back-fill finished within 16 min of reconnection (6 h case); serial log shows no HTTP 429.
 
 **B3 - DMM calibration check and clock check (measurement validity for F7-F9; F7: timestamps within 2 s).**
-1. Run `cal` (two-point INA226 calibration) for each of the three power channels against the bench DMM and a bench supply/load.
+1. Run `cal` (two-point calibration of the power sensors, INA226 or INA219, auto-detected) for each of the three power channels against the bench DMM and a bench supply/load.
 2. Then apply five loads across the range (for example 0.1, 0.5, 1, 3, 5 W) and write down DMM power and the 60 s mean reported on the dashboard.
 3. Clock: with NTP reachable, type `time` on the serial CLI next to a phone showing time.is; then unplug Wi-Fi for 24 h (RTC free-running) and repeat.
 4. Remove the RTC battery with the board off, power on without Wi-Fi: `status` must show fault 4 and no samples are logged; enable the hotspot: logging starts within 2 min.

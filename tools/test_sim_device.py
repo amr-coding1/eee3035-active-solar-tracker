@@ -42,13 +42,13 @@ def device(tx, **kw):
 
 def test_record_json_formats_and_omitted_fields():
     rec = {"t": T0, "p_trk": 12.0, "p_fix": 0.04, "p_use": 105.25, "ang_panel": -3.0, "ang_sun": None, "temp": 8.0,
-           "vbat": 3.9, "seq": 7, "status": "IDL;r=0;p=A;e=0;s=1"}
+           "v_supply": 5.02, "seq": 7, "status": "IDL;r=0;p=A;e=0;s=1"}
     obj = json.loads(sd.record_json(rec))
     assert obj["created_at"] == "2026-11-20 00:00:00 +0000"
     assert "field5" not in obj                       # unknown value is omitted, never written as 0
     text = sd.record_json(rec)
     assert '"field1":12.0,' in text and '"field2":0.0,' in text and '"field3":105.2' in text
-    assert '"field7":3.900,' in text and '"field8":7,' in text
+    assert '"field7":5.020,' in text and '"field8":7,' in text
     rec["ang_sun"] = 1.26
     assert '"field5":1.3' in sd.record_json(rec)
 

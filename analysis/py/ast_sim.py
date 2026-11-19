@@ -3,7 +3,7 @@
 ast_sim.py - small deterministic simulator of channel-1 data (tests and example figures only).
 
 NOT a physical model of the group's tracker: a plausible shape (sun arc, clouds,
-a stepping tracker, motor consumption) so that the analysis code has something
+a stepping tracker, servo consumption) so that the analysis code has something
 realistic to chew on. Every sample it makes is marked simulated ('s=1' in the
 status, contract section 4) unless the caller asks otherwise for a parser test.
 
@@ -48,7 +48,7 @@ def simulate_day(day, seq_start=1, scenario="clear", run=0, panel="A", seed=0, s
     seq = seq_start
     panel_angle = 0.0
     cloud = level
-    vbat = 4.05
+    rnd_v = random.Random("%s|%s|%d|vsup" % (day, scenario, seed))   # own stream: other columns keep their values
     for m in range(1440):
         daylight = SUNRISE_MIN <= m < SUNSET_MIN
         moved = False
@@ -81,8 +81,8 @@ def simulate_day(day, seq_start=1, scenario="clear", run=0, panel="A", seed=0, s
                 state = "MOV"
             p_trk = p_fix = 0.0
         p_use = 0.0 if calibration else 11.0 + rnd.gauss(0, 0.4) + (95.0 if moved else 0.0)
-        vbat += 0.00002 * (p_trk - 400) / 100 - 0.00001
-        vbat = max(3.3, min(4.2, vbat))
+        # field7 V_supply: 5 V feed to the tracker, sagging slightly with the load (as firmware/core/ast_sim.cpp)
+        v_supply = 5.05 - 0.00015 * max(0.0, p_use) + 0.004 * rnd_v.uniform(-1.0, 1.0)
         if m not in wanted:
             continue                                         # not logged: seq does not advance
         u = {
@@ -91,7 +91,7 @@ def simulate_day(day, seq_start=1, scenario="clear", run=0, panel="A", seed=0, s
             "field2": "%.1f" % max(0.0, p_fix),
             "field3": "%.1f" % max(0.0, p_use),
             "field4": "%.1f" % panel_angle,
-            "field7": "%.3f" % vbat,
+            "field7": "%.3f" % v_supply,
             "field8": "%d" % seq,
             "status": "%s;r=%d;p=%s;e=0%s" % (state, run, panel, ";s=1" if sim else ""),
         }

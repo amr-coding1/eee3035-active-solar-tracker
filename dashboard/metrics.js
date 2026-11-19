@@ -38,8 +38,8 @@ export const FAULT_WORDS = {
   4: 'Clock (RTC) missing or lost time',
   5: 'Sun-sensor arc fault',
   6: 'Local buffer overflow (data lost)',
-  7: 'Limit switch hit unexpectedly',
-  8: 'Motor stall or timeout',
+  7: 'Travel limit: angle command outside the safe range',
+  8: 'Servo stall, overload or clutch slip',
   9: 'Upload failing for over 60 minutes',
 };
 
@@ -97,7 +97,7 @@ export function parseFeed(f) {
     angPanel: num(f.field4),
     angSun: num(f.field5),
     temp: num(f.field6),
-    vbat: num(f.field7),
+    vSupply: num(f.field7),
     seq: seq === null ? null : Math.trunc(seq),
     state: st.state,
     run: st.run,

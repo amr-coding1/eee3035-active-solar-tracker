@@ -53,7 +53,7 @@ NA = "n/a"
 
 RAW_CSV_HEADER = [
     "created_at_utc", "time_uk", "entry_id", "seq", "p_trk_mw", "p_fix_mw", "p_use_mw", "ang_panel_deg",
-    "ang_sun_deg", "temp_c", "vbat_v", "state", "run", "panel", "fault", "sim", "status",
+    "ang_sun_deg", "temp_c", "v_supply_v", "state", "run", "panel", "fault", "sim", "status",
 ]
 
 # ------------------------------------------------------------------ parsing
@@ -152,7 +152,7 @@ def parse_feed(f):
         "ang_panel": parse_number(f.get("field4")),
         "ang_sun": parse_number(f.get("field5")),
         "temp": parse_number(f.get("field6")),
-        "vbat": parse_number(f.get("field7")),
+        "v_supply": parse_number(f.get("field7")),
         "seq": None if seq is None else math.trunc(seq),
         "state": st["state"],
         "run": st["run"],
@@ -196,7 +196,7 @@ def read_raw_csv(path):
                 "ang_panel": parse_number(r["ang_panel_deg"]),
                 "ang_sun": parse_number(r["ang_sun_deg"]),
                 "temp": parse_number(r["temp_c"]),
-                "vbat": parse_number(r["vbat_v"]),
+                "v_supply": parse_number(r["v_supply_v"]),
                 "seq": None if seq is None else math.trunc(seq),
                 "state": r["state"] or None,
                 "run": _int_or_0(r["run"]),

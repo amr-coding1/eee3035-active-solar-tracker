@@ -16,7 +16,7 @@ data complete and traceable enough to prove (or disprove) net energy gain.
 | O2 | ESP32 uploads every 15 min over HTTPS; >= 99 % of samples on ThingSpeak within 16 min of their minute when online (24 h bench run) | Firmware written and host-tested; ESP32 compile passes | F8, client req. (ii) | 26 Nov lab |
 | O3 | No sample lost across a 7-day Wi-Fi outage (8-day buffer): proven in virtual-time E2E and a >= 2 h hotspot-off test on hardware | Buffer and back-fill already pass in simulation | F7 | 3 Dec lab |
 | O4 | Nightly MATLAB job agrees with the dashboard on 100 % of complete days (contract 6.5) for 7 consecutive days | Same formulas in Python, MATLAB, JS; agreement rule automated | F9 analysis, MPS 5 | 4 Dec |
-| O5 | Data-link energy measured (radio-on s/day, MCU current via INA226 ch3) and kept <= 0.5 Wh/day | Radio off between uploads, 80 MHz CPU; PVGIS shows why it matters | F10 | 3 Dec lab |
+| O5 | Data-link energy measured (radio-on s/day, tracker current via the consumption sensor, ch3: INA226 or INA219) and kept <= 0.5 Wh/day | Radio off between uploads, 80 MHz CPU; PVGIS shows why it matters | F10 | 3 Dec lab |
 | O6 | DMP v2 agreed by the group; weekly CSV backup to OneDrive every week to 22 Jan | DMP v2 drafted; export button exists | Data governance (report rubric) | Agree 19 Nov; weekly |
 | O7 | AM report sections drafted for peer review, then final | Material in this pack | Final report 65 % | Draft 4 Dec, final 10 Dec |
 
