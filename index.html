@@ -176,17 +176,17 @@ ul.plain { margin: 0; padding-left: 1.2rem; display: grid; gap: 6px; }
   </section>
 
   <section aria-labelledby="evidence">
-    <h2 id="evidence">Test evidence (13 Nov 2026)</h2>
+    <h2 id="evidence">Test evidence (13 Nov 2026; firmware rows updated 19 Nov)</h2>
     <div class="table-wrap">
       <table class="stack">
         <thead><tr><th scope="col">Check</th><th scope="col">What it shows</th><th scope="col">Result</th></tr></thead>
         <tbody>
           <tr><td>End to end, S1–S12</td><td>Real firmware core, real MATLAB script (in GNU Octave) and the real dashboard in Chrome, in virtual time: outages up to 7.5 days, reboot, lost responses, late data corrected, two phones agree, CSV equals the device log, sample to screen within 17 min</td><td class="num"><span class="chip pass">129 / 129</span></td></tr>
-          <tr><td>Firmware</td><td>195 unit tests under sanitizers, thread-sanitizer test; Nano ESP32 build with 0 warnings</td><td class="num"><span class="chip pass">pass</span></td></tr>
+          <tr><td>Firmware</td><td>215 unit tests under sanitizers, including a closed-loop lamp-sweep twin of the whole tracker; thread-sanitizer test; Nano ESP32 builds with 0 warnings on core 3.3.12, core 4.0.0 and PlatformIO</td><td class="num"><span class="chip pass">pass</span></td></tr>
           <tr><td>MATLAB on ThingSpeak</td><td>Nightly job on the real service: 9 daily rows identical to the independent Python reference</td><td class="num"><span class="chip pass">identical</span></td></tr>
           <tr><td>Dashboard</td><td>41 tests incl. WCAG 2.2 AA (axe-core, light and dark), a 320 px phone, colour-blind-safe charts with data tables</td><td class="num"><span class="chip pass">41 / 41</span></td></tr>
-          <tr><td>Independent review</td><td>A separate AI agent checked correctness, security and documentation; 3 medium and 7 low findings, all fixed and re-tested</td><td class="num"><span class="chip pass">10 / 10</span></td></tr>
-          <tr><td>Hardware</td><td>Wi-Fi, TLS, clock, sensors, current draw: bench procedures B1–B4</td><td class="num"><span class="chip wait">when parts arrive</span></td></tr>
+          <tr><td>Independent reviews</td><td>Separate AI agents checked correctness, security and documentation: the data link on 13 Nov (3 medium and 7 low findings) and the tracker firmware on 19 Nov (11 issues); all fixed and re-tested</td><td class="num"><span class="chip pass">21 / 21</span></td></tr>
+          <tr><td>Hardware</td><td>Wi-Fi, TLS, clock, sensors, servo, current draw: bench runbook W1–W8 and M0–M13</td><td class="num"><span class="chip wait">from Wed 25 Nov</span></td></tr>
         </tbody>
       </table>
     </div>
