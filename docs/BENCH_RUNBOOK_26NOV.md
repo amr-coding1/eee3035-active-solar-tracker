@@ -164,7 +164,7 @@ Expect (firmware as built, servo switched off between moves): 2.87 Wh/day, about
 | Servo not mounted or no switch yet | `kServoPowerPin = -1`; W5 on the bench with the servo loose (horn marked); M9 waits for the frame |
 | Photodiodes not ready | Tracking off (`servo 0`, manual); the data path and powers still work (angles omitted) |
 | Hotspot will not join | Second phone; hotspot settings screen kept open; `time 2026-11-26T10:40:00Z` by hand to keep logging; upload later (8-day buffer) |
-| No board at all | `firmware/build.sh host` on the laptop (211 tests incl. the closed-loop twin), sleep sketch, wiring check against section 1, agree the decisions, M11 with the bench supply |
+| No board at all | `firmware/build.sh host` on the laptop (215 tests incl. the closed-loop twin), sleep sketch, wiring check against section 1, agree the decisions, M11 with the bench supply |
 | Upload refused | Note the HTTP code and log line; do not retype keys in front of others; carry on with S5 using the DMM |
 
 ## 6. Results table
