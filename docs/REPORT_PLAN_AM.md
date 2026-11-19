@@ -72,3 +72,9 @@ responses, verification, adaptation) — REQUIRED and "monitored strictly".
 | Thu 10 Dec | Two-phone test; final figures; report sections peer-reviewed |
 | Fri 11 Dec | Report submitted (each member submits) |
 | Mon 25 Jan | Presentation + live demo (AM: live dashboard on phones) |
+
+## Updates (AM, 19 Nov 2026)
+
+- **Energy numbers (point 2, and the row for comments 0 and 3).** The 2.3 Wh/day data-link estimate was too low. The bottom-up model in `docs/energy/power_budget.md` gives 3.11 Wh/day as built, now including the motor driver and the motor. The headline becomes +29 % gross and +9 % net per year (not +14 %), with a net loss from October to February. With light sleep the tracker draws about 0.53 Wh/day: +26 % a year and a gain in every month. Design target for P_use: 22.5 mW average (0.54 Wh/day), the December break-even divided by 1.3. All model figures until the 26 Nov measurements.
+- **Comment 20** sits at the end of the AI log appendix, which gave summaries of prompts and responses. The marker's point is that the brief asked for the full output: verbatim prompts and raw responses, not a list of logged quantities. Fix: full prompts and outputs in the AI appendix.
+- **Comment 6** is about the caption of Table 1 ("Main risks"): the table holds requirements, not risks. Fix: proofread captions and cross-references. Comment 5 is the one about aims and SMART objectives.
