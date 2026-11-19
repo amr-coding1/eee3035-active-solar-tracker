@@ -31,7 +31,7 @@ responses, verification, adaptation) — REQUIRED and "monitored strictly".
    Against a flat panel the "gain" (+146 %) is mostly tilt; against the tilted panel it is
    +17 %. Lem's 5 Nov plan compares with a panel "FLAT on the ground".
 2. **P_use is everything (Lem, 17 Nov).** Net gain counts all the tracker draws: MCU
-   with Wi-Fi, sensors, driver and motor (INA226 #3 on the whole tracker supply line).
+   with Wi-Fi, sensors and servo (consumption sensor #3 in the 5 V feed to the tracker).
    PVGIS model, same 5.4 W panel, inclined-axis tracker vs 39° fixed (docs/energy/):
    gross gain +29 %/year (Nov +17 %, Dec +12 %). Net of the data link's estimated
    2.3 Wh/day: +14 %/year, but negative in Nov-Feb (Nov -10 %, Dec -27 %), so the
@@ -39,7 +39,7 @@ responses, verification, adaptation) — REQUIRED and "monitored strictly".
    report shows gross and net month by month (answers comments 9, 15 and 19 below).
    A board left fully awake (~4.8 Wh/day) loses over the whole year (-2 %); light sleep
    between samples (~0.24 Wh/day) gives +28 %/year and a gain in every month. The
-   motor adds on top: measure it on the bench (INA226 #3 or DMM). Figure and table ready:
+   servo adds on top: measure it on the bench (sensor #3 or DMM). Figure and table ready:
    docs/figures/net_gain_by_month.png, docs/energy/net_gain_by_month.md.
 3. **Indoor lamp tests prove the mechanism, not the yield.** Use PVGIS for the outdoor
    yield argument (validation), lamp runs for F1-F3 verification.
@@ -56,7 +56,7 @@ responses, verification, adaptation) — REQUIRED and "monitored strictly".
 | 5, 6: SMART objectives and requirements | Numbered requirements with metric and margin; SMART objectives per subsystem | docs/AM_OBJECTIVES_FMEA.md (data link) |
 | 7, 8: store what, send what, why both on the device and online | Field table (what is sent each minute and each day); device buffer covers outages, ThingSpeak does analysis | docs/CONTRACT.md, docs/DMP_v2.md |
 | 9, 15, 19: can the panel pay for its own movement; model the gain; energy gained vs energy spent | Gross and net gain month by month (point 2), then the bench P_use measurement | docs/energy/, INA226 #3 |
-| 10, 13: actuator and roof mounting under wind and weight | Wind-load torque against the actuator rating; mounting mass | mechanical team |
+| 10, 13: actuator and roof mounting under wind and weight | Wind-load torque against the servo's holding torque and clutch (holding when not powered to be tested on the bench); mounting mass | mechanical team |
 | 11: fewer sensors? | Trade-off: sensor count vs pointing accuracy and cost | sensing team |
 | 12: what cost? | BOM total (parts ordered 17 Nov) and cost per extra Wh | BOM |
 | 14: Gantt | Work packages, milestones, deliverables, dependencies and the critical path | Gantt |
@@ -75,6 +75,6 @@ responses, verification, adaptation) — REQUIRED and "monitored strictly".
 
 ## Updates (AM, 19 Nov 2026)
 
-- **Energy numbers (point 2, and the row for comments 0 and 3).** The 2.3 Wh/day data-link estimate was too low. The bottom-up model in `docs/energy/power_budget.md` gives 3.11 Wh/day as built, now including the motor driver and the motor. The headline becomes +29 % gross and +9 % net per year (not +14 %), with a net loss from October to February. With light sleep the tracker draws about 0.53 Wh/day: +26 % a year and a gain in every month. Design target for P_use: 22.5 mW average (0.54 Wh/day), the December break-even divided by 1.3. All model figures until the 26 Nov measurements.
+- **Energy numbers (point 2, and the row for comments 0 and 3).** The 2.3 Wh/day data-link estimate was too low. The bottom-up model in `docs/energy/power_budget.md` gives 2.87 Wh/day as built (3.11 before the actuator changed to a power-gated DS-R001 servo on 19 Nov). The headline becomes +29 % gross and +10 % net per year (not +14 %), with a net loss from October to February. With light sleep the tracker draws about 0.49 Wh/day: +26 % a year and a gain in every month. The servo must be power-gated: left powered it draws 1.2 to 4.8 Wh/day (standby 10 to 40 mA at 5 V), more than the December tracking gain of 0.70 Wh/day; gated it costs a few mWh/day. Whether it holds the panel when not powered is still to be tested. Design target for P_use: 22.5 mW average (0.54 Wh/day), the December break-even divided by 1.3. All model figures until the 26 Nov measurements.
 - **Comment 20** sits at the end of the AI log appendix, which gave summaries of prompts and responses. The marker's point is that the brief asked for the full output: verbatim prompts and raw responses, not a list of logged quantities. Fix: full prompts and outputs in the AI appendix.
 - **Comment 6** is about the caption of Table 1 ("Main risks"): the table holds requirements, not risks. Fix: proofread captions and cross-references. Comment 5 is the one about aims and SMART objectives.

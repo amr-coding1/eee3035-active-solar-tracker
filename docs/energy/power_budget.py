@@ -3,8 +3,10 @@
 
 Question (marker, design brief): can the panel pay for its own movement?
     net gain >= 0   <=>   E_use <= E_tracked - E_fixed          (per day, per month)
-P_use is everything the tracker draws (MCU with Wi-Fi, sensors, driver, motor),
-measured by INA226 #3 (0x44) on the tracker supply line (group decision 17 Nov 2026).
+P_use is everything the tracker draws (MCU with Wi-Fi, sensors, servo), measured by the
+consumption sensor (INA226 or INA219, auto-detected; "#3", I2C 0x44) in the 5 V feed to
+the tracker (group decision 17 Nov 2026, wiring correction 19 Nov 2026). The actuator is
+a DS-R001 hobby servo fed at 5 V from a power bank and power-gated by the firmware.
 
 Run:  python3 power_budget.py [path/to/repo/docs/energy]
 Writes next to this file: power_budget.md, power_budget_numbers.json,
@@ -36,8 +38,6 @@ SOURCES = {
               "https://forum.arduino.cc/t/power-hungry-in-deep-sleep/1204775"),
     "INA": ("Texas Instruments, INA226 datasheet SBOS547, section 5.5 Electrical Characteristics",
             "https://www.ti.com/lit/ds/symlink/ina226.pdf"),
-    "DRV": ("Texas Instruments, DRV8833 datasheet SLVSAR1E, sections 6.3 and 6.5",
-            "https://www.ti.com/lit/ds/symlink/drv8833.pdf"),
     "RTC": ("Analog Devices (Maxim), DS3231 datasheet 19-5170 Rev 10, Electrical Characteristics",
             "https://www.analog.com/media/en/technical-documentation/data-sheets/DS3231.pdf"),
     "BPX": ("OSRAM Opto Semiconductors, BPX 65 datasheet v1.2 (2015-08-26), Characteristics; ams OSRAM product page",
@@ -45,10 +45,12 @@ SOURCES = {
             "https://ams-osram.com/products/photodetectors/photodiodes/osram-metal-can-to18-bpx-65"),
     "WS": ("Waveshare wiki, Solar Power Manager, Specifications (base model)",
            "https://www.waveshare.com/wiki/Solar_Power_Manager"),
-    "M6": ("JGY-370-CE 6 V worm gearmotor listing (18 rpm, no-load 0.08 A, self-locking)",
-           "https://www.crcibernetica.com/high-torque-worm-gear-motor-6v"),
-    "M12": ("Aslong JGY-370 12 V worm gearmotor listing (no-load 35 mA, load 180 mA, stall 1 A)",
-            "https://core-electronics.com.au/aslong-jgy-370-12v-dc-worm-gear-motor-seeed-studio.html"),
+    "SER": ("DFRobot SER0051 '6 kg 180° clutch servo' and reseller listings, very probably the same part as the "
+            "DS-R001 (4.8-6 V, 500-2500 µs for 0-180°, standby <= 10 mA, no-load <= 60 mA, stall <= 1.65 A at 6 V, "
+            "0.21 s/60°, clutch, stall protection after 5 s). Figures as collected by the group on 19 Nov 2026",
+            "(listing; link not recorded in the repository)"),
+    "DSP": ("DSpower, DS-R001 product page (standby <= 40 mA)",
+            "(manufacturer page; link not recorded in the repository)"),
     "REPO": ("Group repository: firmware/README.md 'Energy budget', docs/CONTRACT.md 7.1-7.3, "
              "firmware/core/ast_sim.h, docs/energy/", "(local)"),
 }
@@ -88,24 +90,33 @@ N_PD = 5
 I_PD_DAY = (0.01, 0.2, 1.0)       # mA per diode in daylight (0.01 = 1 klx overcast; 1.0 = ~100 klx if not resistor-limited)
 DAYLIGHT_H = 10.0                 # hours per day the arc is lit (annual mean, ASSUMED)
 
-I_DRV_ON = (1.7, 1.7, 3.0)        # DRV8833 awake, outputs off, mA at VM = 5 V     [DS DRV 6.5]
-I_DRV_SLEEP = (0.0016, 0.0016, 0.0025)  # DRV8833 nSLEEP low, mA at 5 V            [DS DRV 6.5]
-R_DRV = 0.36                      # HS + LS on-resistance at 5 V, ohm (200 + 160 mohm) [DS DRV 6.5]
-
 # Converters
 ETA_BUCK = (0.85, 0.90, 0.92)       # MP2322 on the Nano, 5 V in, "normal" load: ">90 % at 4.5 V"  [DS NANO 11.3]
 ETA_BUCK_LIGHT = (0.60, 0.80, 0.90)  # same converter at a few mA: NOT published in the Arduino datasheet, ASSUMED
-ETA_BOOST = 0.86                    # Solar Power Manager, battery -> 5 V "approx. 86 %"     [DS WS]
+ETA_BOOST = 0.86                    # converter upstream of the 5 V feed. Solar Power Manager, battery -> 5 V
+                                    # "approx. 86 %" [DS WS]; ASSUMED the same for a power bank. Outside P_use.
 I_Q_MANAGER = 2.0                   # Solar Power Manager quiescent "< 2 mA" (a maximum)     [DS WS]
 
-# Motor: worm-gear DC motor, exact part not in the repository/BOM. Range from JGY-370 listings.
-V_MOTOR = 5.0
-I_MOTOR = (0.08, 0.20, 1.0)       # A while moving: no-load 6 V type [M6]; load current 12 V type 180 mA [M12]; stall 1 A [M12]
-OMEGA = (0.5, 2.0, 6.0)           # deg/s at the panel axis: 2.0 is the repo simulator default [REPO]; ASSUMED range
-I_START, T_START = 1.0, 0.1       # start surge: stall current [M12] for an ASSUMED 0.1 s per start
-LIMIT_DEG = 60.0                  # mechanical travel either side of level [REPO ast_sim.h]
-SUN_RATE = 15.0                   # deg/h about a polar-ish axis
-TRAVEL_DEG = 4 * LIMIT_DEG        # 120 deg sweep + 120 deg return per day = 240 deg
+# Actuator: DS-R001 hobby servo (DSpower; very probably the part DFRobot sells as SER0051). The listings
+# disagree, so ranges are used. Fed at 5 V from the power-bank branch through a high-side P-MOSFET that the
+# firmware switches from a GPIO (power gating). Plastic spur gears: NOT self-locking. Nothing measured yet.
+V_SERVO = 5.0
+I_SERVO_STBY = (10.0, 20.0, 40.0)  # mA, powered and not moving: <= 10 mA at 6 V [SER]; <= 20 mA (figure quoted
+                                   # in the group, ASSUMED); <= 40 mA [DSP]. All three are upper limits.
+I_SERVO_NOLOAD = 60.0              # mA, running with no load, <= 60 mA at 6 V                      [SER]
+I_SERVO_STALL = (1.4, 1.65)        # A: about 1.4 A at 5 V (scaled, ASSUMED); <= 1.65 A at 6 V      [SER]
+T_SERVO_60 = 0.21                  # s per 60 deg with no load                                      [SER]
+T_STALL_CUT = 5.0                  # s blocked before the built-in protection cuts the motor        [SER]
+I_MOVE_TYP, T_MOVE = 0.100, 0.4    # one small move: about 100 mA mean for about 0.4 s. ASSUMED
+I_MOVE_WORST = 1.0                 # worst small move: 1 A mean for the same 0.4 s (near stall). ASSUMED
+E_MOVE = (V_SERVO * I_MOVE_TYP * T_MOVE, V_SERVO * I_MOVE_WORST * T_MOVE)   # J per small move: 0.2 typical, 2 worst
+E_RETURN = E_MOVE[1]               # J for the one long return move after dusk: taken as the worst figure. ASSUMED
+T_GATE_ON = 1.0                    # s the servo is powered per move (start-up, move, settle), MCU awake. ASSUMED
+I_GATE_LEAK = 0.001                # mA at 5 V through the P-MOSFET when off (order of 1 uA). ASSUMED
+DEADBAND_DEG = 5.0                 # the control code moves when the pointing error exceeds this
+SUN_RATE = 15.0                    # deg/h about a polar-ish axis
+MOVE_EVERY_MIN = DEADBAND_DEG / SUN_RATE * 60    # 20 min of daylight per move
+DAYLIGHT_CASES = (8.0, 10.0, 16.0)  # h: December, annual mean used in the scenarios, June (rounded)
 SECONDS = 86400.0
 
 # --------------------------------------------------------------------------- PVGIS
@@ -137,25 +148,27 @@ def mode_power_5v(i_mcu_ma, i_33_other_ma, eta):
     return (i_mcu_ma + i_33_other_ma) * V33 / eta
 
 
-def motor_energy_wh(interval_min, i_a=I_MOTOR[1], omega=OMEGA[1], i_mcu=I_MS80[1]):
-    """Daily motor energy at the 5 V rail (Wh/day) for step tracking every `interval_min`.
+def servo_moves(daylight_h=DAYLIGHT_H, e_move=E_MOVE[0], gated=True, i_mcu=I_MS80[1]):
+    """Daily energy of the servo MOVES at the 5 V feed, for dead-band tracking.
 
-    Worm gear is self-locking: no holding current. Driver awake only while moving.
+    One small move per MOVE_EVERY_MIN of daylight plus one return move after dusk.
+    gated=True (servo powered only around a move): adds the servo's standby current for the
+    rest of the powered window and the MCU held awake for the window.
+    gated=False (servo powered all day, MCU never asleep): those two are already in the
+    24 h rows of the scenario, so only the moves themselves are counted here.
     """
-    t_run = TRAVEL_DEG / omega                               # s/day, independent of the interval
-    sweep_h = 2 * LIMIT_DEG / SUN_RATE                       # 8 h to sweep 120 deg
-    n_moves = int(round(sweep_h * 60 / interval_min)) + 1    # + one return move
-    e_run = V_MOTOR * i_a * t_run                            # J (includes the DRV8833 I^2R, it is in series)
-    e_start = n_moves * V_MOTOR * max(I_START - i_a, 0.0) * T_START
-    e_drv = V5 * I_DRV_ON[1] / 1000 * (t_run + n_moves * 0.05)
-    e_mcu = (i_mcu * V33 / ETA_BUCK[1] / 1000) * t_run       # MCU must be awake while the motor runs
-    step_deg = SUN_RATE * interval_min / 60
-    half = np.radians(step_deg / 2)
-    cos_loss = 1 - np.sin(half) / half                       # mean beam loss, error uniform in +/- step/2
-    return {"interval_min": interval_min, "moves_per_day": n_moves, "step_deg": step_deg,
-            "run_s_per_day": t_run, "E_Wh": (e_run + e_start + e_drv + e_mcu) / 3600,
-            "E_run_J": e_run, "E_start_J": e_start, "E_drv_J": e_drv, "E_mcu_J": e_mcu,
-            "cos_loss_pct": 100 * cos_loss, "drv_loss_mW_while_running": 1000 * i_a ** 2 * R_DRV}
+    n_small = int(round(daylight_h * 60 / MOVE_EVERY_MIN))
+    n_moves = n_small + 1
+    e_moves = n_small * e_move + max(E_RETURN, e_move)
+    e_window = n_moves * V_SERVO * I_SERVO_STBY[1] / 1000 * (T_GATE_ON - T_MOVE) if gated else 0.0
+    e_mcu = n_moves * (i_mcu * V33 / ETA_BUCK[1] / 1000) * T_GATE_ON if gated else 0.0
+    d = np.radians(DEADBAND_DEG)
+    cos_loss = 1 - np.sin(d) / d                             # mean beam loss, error uniform in 0..dead band
+    e_j = e_moves + e_window + e_mcu
+    return {"daylight_h": daylight_h, "moves_per_day": n_moves, "move_every_min": MOVE_EVERY_MIN,
+            "E_per_small_move_J": e_move, "E_moves_J": e_moves, "E_window_J": e_window, "E_mcu_J": e_mcu,
+            "E_J": e_j, "E_Wh": e_j / 3600, "powered_s_per_day": n_moves * T_GATE_ON if gated else SECONDS,
+            "cos_loss_pct": float(100 * cos_loss), "gated": gated}
 
 
 def electronics(name, parts, note):
@@ -170,8 +183,10 @@ def build_scenarios():
     sens_sleep = N_INA * I_INA[1] + I_RTC[0]            # DS3231 standby while the bus is idle
     led = I_LED[1]
     pd_ungated = N_PD * I_PD_DAY[1] * DAYLIGHT_H / 24   # 24 h mean, arc biased all the time
-    drv_on = V5 * I_DRV_ON[1]                           # mW
-    drv_sleep = V5 * I_DRV_SLEEP[1]
+    servo_on = V_SERVO * I_SERVO_STBY[1]                # mW, servo powered all day (central standby figure)
+    servo_gated = V_SERVO * I_GATE_LEAK                 # mW, P-MOSFET off: leakage only
+    servo_on_label = f"DS-R001 servo left powered (standby {I_SERVO_STBY[1]:.0f} mA at 5 V)"
+    servo_gated_label = "DS-R001 servo power-gated: P-MOSFET off (leakage)"
     n_up15, n_up60 = 96, 24
     d_up15, d_up60 = n_up15 * T_UPLOAD_S / SECONDS, n_up60 * T_UPLOAD_S / SECONDS
     eb, el = ETA_BUCK[1], ETA_BUCK_LIGHT[1]
@@ -179,13 +194,13 @@ def build_scenarios():
 
     # (a) always awake, 240 MHz, Wi-Fi connected all the time, nothing gated
     sc["a"] = electronics(
-        "(a) always awake, Wi-Fi connected",
+        "(a) always awake, Wi-Fi connected, servo powered",
         [("MCU 240 MHz, Wi-Fi associated (modem power-save)", mode_power_5v(I_WIFI_ON[1], 0, eb), 1.0),
          ("3x INA226 + DS3231", mode_power_5v(0, sens, eb), 1.0),
          ("power LED", mode_power_5v(0, led, eb), 1.0),
          ("BPX65 arc, biased continuously", mode_power_5v(0, pd_ungated, eb), 1.0),
-         ("DRV8833 left awake", drv_on, 1.0)],
-        "240 MHz, Wi-Fi never switched off, driver never put to sleep")
+         (servo_on_label, servo_on, 1.0)],
+        "240 MHz, Wi-Fi never switched off, servo powered all day")
 
     # (b) data link as built: 80 MHz, radio off between 15-min uploads, no sleep
     sc["b"] = electronics(
@@ -195,8 +210,8 @@ def build_scenarios():
          ("3x INA226 + DS3231", mode_power_5v(0, sens, eb), 1.0),
          ("power LED", mode_power_5v(0, led, eb), 1.0),
          ("BPX65 arc, biased continuously", mode_power_5v(0, pd_ungated, eb), 1.0),
-         ("DRV8833 left awake", drv_on, 1.0)],
-        "firmware of 13 Nov 2026 plus a control loop that never sleeps the driver")
+         (servo_gated_label, servo_gated, 1.0)],
+        "firmware of 13 Nov 2026 (never sleeps) with the servo power-gated between moves")
 
     # (c) light sleep; wake every 15 s for 0.25 s (4 reads/min keep a true minute mean with
     #     INA226 1024x averaging); uploads still every 15 min (requirement F8 unchanged)
@@ -209,8 +224,8 @@ def build_scenarios():
          ("3x INA226 (continuous) + DS3231 standby", mode_power_5v(0, sens_sleep, el), 1.0),
          ("power LED", mode_power_5v(0, led, el), 1.0),
          ("BPX65 arc, bias gated to the wake window", mode_power_5v(0, pd_ungated * d_wake, el), 1.0),
-         ("DRV8833 asleep (nSLEEP low)", drv_sleep, 1.0)],
-        "explicit esp_light_sleep_start() in the sampler; driver and arc gated")
+         (servo_gated_label, servo_gated, 1.0)],
+        "explicit esp_light_sleep_start() in the sampler; servo and arc gated")
 
     # (d) aggressive: as (c) but hourly uploads, power LED removed, 1 wake/min at night
     night = 1 - DAYLIGHT_H / 24
@@ -222,7 +237,7 @@ def build_scenarios():
          ("upload session 24/day x 9 s", mode_power_5v(I_UPLOAD[1], 0, eb), d_up60),
          ("3x INA226 (continuous) + DS3231 standby", mode_power_5v(0, sens_sleep, el), 1.0),
          ("BPX65 arc, bias gated to the wake window", mode_power_5v(0, pd_ungated * d_wake_d, el), 1.0),
-         ("DRV8833 asleep (nSLEEP low)", drv_sleep, 1.0)],
+         (servo_gated_label, servo_gated, 1.0)],
         "needs F8 relaxed from 15 to 60 min and the LED track cut")
 
     # (d-deep) deep sleep variant, shown to explain why it is NOT recommended on this board
@@ -234,7 +249,7 @@ def build_scenarios():
          ("cold boot + sample, 0.5 s per minute", mode_power_5v(i_boot, 0, eb), d_boot),
          ("upload session 24/day x 9 s", mode_power_5v(I_UPLOAD[1], 0, eb), d_up60),
          ("3x INA226 (continuous) + DS3231 standby", mode_power_5v(0, sens_sleep, el), 1.0),
-         ("DRV8833 asleep (nSLEEP low)", drv_sleep, 1.0)],
+         (servo_gated_label, servo_gated, 1.0)],
         "board deep-sleep current measured by users (1.75-2.6 mA) exceeds light sleep (0.56-1.27 mA)")
     return sc
 
@@ -282,19 +297,22 @@ def main():
         check["cells_compared"] = 12 * 6
     check["as_built_reproduced_Wh_day"] = repo_as_built
 
-    # --- bottom-up scenarios and motor
+    # --- bottom-up scenarios and servo
     sc = build_scenarios()
-    motor = {T: motor_energy_wh(T) for T in (5, 10, 15)}
-    motor_worst = motor_energy_wh(10, i_a=I_MOTOR[2], omega=OMEGA[0])
-    motor_best = motor_energy_wh(10, i_a=I_MOTOR[0], omega=OMEGA[2])
-    MOTOR_T = {"a": 10, "b": 10, "c": 10, "d": 15, "d_deep": 15}
+    servo = {h: servo_moves(h) for h in DAYLIGHT_CASES}                        # power-gated, typical move
+    servo_worst = {h: servo_moves(h, e_move=E_MOVE[1]) for h in DAYLIGHT_CASES}  # power-gated, worst move
+    SERVO_GATED = {"a": False, "b": True, "c": True, "d": True, "d_deep": True}
+    # (b): the MCU never sleeps, so only the moves and the powered window count
+    servo_sc = {k: servo_moves(gated=g) if not g else servo_moves(i_mcu=0.0 if k == "b" else I_MS80[1])
+                for k, g in SERVO_GATED.items()}
+    standby_wh = [V_SERVO * i * 24 / 1000 for i in I_SERVO_STBY]                # servo powered all day
     tot = {}
     for k, s in sc.items():
-        e_m = motor[MOTOR_T[k]]["E_Wh"]
+        e_m = servo_sc[k]["E_Wh"]
         e5 = s["Wh_day"] + e_m
-        tot[k] = {"name": s["name"], "electronics_Wh_day": s["Wh_day"], "motor_Wh_day": e_m,
-                  "motor_interval_min": MOTOR_T[k], "total_Wh_day_5V": e5, "mean_mW_5V": e5 / 24 * 1000,
-                  "total_Wh_day_battery": e5 / ETA_BOOST, "mean_mA_at_5V": e5 / 24 / V5 * 1000}
+        tot[k] = {"name": s["name"], "electronics_Wh_day": s["Wh_day"], "servo_moves_Wh_day": e_m,
+                  "servo_power_gated": SERVO_GATED[k], "total_Wh_day_5V": e5, "mean_mW_5V": e5 / 24 * 1000,
+                  "total_Wh_day_upstream": e5 / ETA_BOOST, "mean_mA_at_5V": e5 / 24 / V5 * 1000}
 
     # --- net gain per month, sensitivity
     keys = ["a", "b", "c", "d"]
@@ -307,12 +325,20 @@ def main():
         sens[k] = {
             "same_tilt": {"-30%": neg(budget, 0.7 * e), "nominal": neg(budget, e), "+30%": neg(budget, 1.3 * e)},
             "flat_ref": {"-30%": neg(budget_flat, 0.7 * e), "nominal": neg(budget_flat, e), "+30%": neg(budget_flat, 1.3 * e)},
-            "battery_side": {"nominal": neg(budget, e / ETA_BOOST), "+30%": neg(budget, 1.3 * e / ETA_BOOST)},
+            "upstream_of_converter": {"nominal": neg(budget, e / ETA_BOOST), "+30%": neg(budget, 1.3 * e / ETA_BOOST)},
             "worst_month_margin_Wh": float((budget - e).min()),
             "worst_month_headroom_pct": float(100 * (budget.min() / e - 1)),
             "year_net_pct": float(100 * ((trk - fix - e) * DAYS).sum() / (fix * DAYS).sum()),
         }
     manager_q_wh = I_Q_MANAGER / 1000 * VBAT * 24
+
+    # servo left powered all day: what each scenario becomes, and what the standby alone does
+    e_elec_gated = {k: tot[k]["total_Wh_day_5V"] for k in ("b", "c", "d")}
+    ungated = [{"standby_mA": i, "mW": V_SERVO * i, "Wh_day": w, "pct_of_dec_budget": float(100 * w / budget.min()),
+                "loss_months_servo_alone": neg(budget, w),
+                "totals_Wh_day": {k: e + w for k, e in e_elec_gated.items()},
+                "loss_months": {k: neg(budget, e + w) for k, e in e_elec_gated.items()}}
+               for i, w in zip(I_SERVO_STBY, standby_wh)]
 
     # design target: positive in the worst month with +30 % on consumption
     target_wh = float(budget.min() / 1.3)
@@ -326,46 +352,51 @@ def main():
     p_ls = mode_power_5v(I_LS_BOARD[1], N_INA * I_INA[1] + I_RTC[0] + I_LED[1], ETA_BUCK_LIGHT[1])
     p_ds = mode_power_5v(I_DS_BOARD[1], N_INA * I_INA[1] + I_RTC[0] + I_LED[1], ETA_BUCK_LIGHT[1])
     bench = [
-        ("M0", "Zero check: INA226 #3 reading with the tracker supply line open", "INA226 #3", "0.0 mA",
-         "|reading| <= 0.1 mA (4 LSB of 25 uA with the 0.1 ohm shunt); otherwise subtract it"),
-        ("M1", "INA226 #3 against the DMM in series (DMM on its 10 A/200 mA range, note burden voltage) at two steady loads, about 20 mA and 200 mA",
+        ("M0", "Zero check: sensor #3 reading with the 5 V feed to the tracker open", "sensor #3", "0.0 mA",
+         "|reading| <= 0.1 mA (4 LSB of 25 uA for an INA226 with the 0.1 ohm shunt; an INA219 resolves 0.1 mA); otherwise subtract it"),
+        ("M1", "Sensor #3 against the DMM in series (DMM on its 10 A/200 mA range, note burden voltage) at two steady loads, about 20 mA and 200 mA",
          "both", "same reading", "within +/-2 % (repo procedure B3); repeat `cal use` if not"),
-        ("M2", "Firmware as built, radio OFF, 80 MHz, driver disconnected: mean over 60 s",
+        ("M2", "Firmware as built, radio OFF, 80 MHz, servo unplugged or gated off: mean over 60 s",
          "both", f"{p_idle:.0f} mW = {p_idle / V5:.1f} mA at 5 V (model range {mode_power_5v(I_MS80[0], sensors + I_LED[0], ETA_BUCK[2]):.0f}-{p_idle_hi:.0f} mW)",
          f"<= {p_idle_hi:.0f} mW. Above it: something unexpected is on (USB, LEDs, 240 MHz)"),
         ("M3", "One upload session (CLI `upload`): mean power while `radio_on_s` counts, and the session length",
-         "INA226 #3 (1 Hz) + serial log", f"{p_up:.0f} mW = {p_up / V5:.0f} mA at 5 V for {T_UPLOAD_S:.0f} s = {p_up * T_UPLOAD_S / 1000:.1f} J per upload",
+         "sensor #3 (1 Hz) + serial log", f"{p_up:.0f} mW = {p_up / V5:.0f} mA at 5 V for {T_UPLOAD_S:.0f} s = {p_up * T_UPLOAD_S / 1000:.1f} J per upload",
          f"<= {mode_power_5v(I_UPLOAD[2], sensors + I_LED[1], ETA_BUCK[0]) * 12 / 1000:.1f} J per upload (150 mA, 12 s); radio_on_s <= 12 s"),
         ("M4", "Test sketch: esp_light_sleep_start() with timer wake, sensors connected, USB unplugged, 60 s mean",
-         "DMM (uA/mA range) and INA226 #3", f"{p_ls:.1f} mW = {p_ls / V5:.2f} mA at 5 V",
-         f"<= {target_mw * 0.75:.0f} mW ({target_mw * 0.75 / V5:.1f} mA at 5 V): leaves 25 % of the {target_mw:.1f} mW target for wakes, uploads and motor"),
+         "DMM (uA/mA range) and sensor #3", f"{p_ls:.1f} mW = {p_ls / V5:.2f} mA at 5 V",
+         f"<= {target_mw * 0.75:.0f} mW ({target_mw * 0.75 / V5:.1f} mA at 5 V): leaves 25 % of the {target_mw:.1f} mW target for wakes, uploads and servo moves"),
         ("M5", "Same sketch with esp_deep_sleep_start()", "DMM", f"{p_ds:.1f} mW = {p_ds / V5:.2f} mA at 5 V (expected HIGHER than M4)",
          "information only: use deep sleep only if it reads lower than M4"),
-        ("M6", "DRV8833 on the 5 V rail, motor stopped: nSLEEP high minus nSLEEP low", "DMM",
-         f"{I_DRV_ON[1]:.1f} mA difference (max {I_DRV_ON[2]:.0f} mA); asleep {I_DRV_SLEEP[1] * 1000:.1f} uA",
-         f"awake <= {I_DRV_ON[2]:.0f} mA; asleep: no visible change on the mA range (< 0.01 mA)"),
-        ("M7", "Motor moving the panel, both directions, at the supply voltage used: running current and start peak",
-         "DMM 10 A range (running), INA226 #3 for the mean", f"{I_MOTOR[1] * 1000:.0f} mA running (range {I_MOTOR[0] * 1000:.0f}-{I_MOTOR[2] * 1000:.0f} mA); start peak about {I_START:.0f} A",
-         "running <= 400 mA; below the INA226 range (819 mA with 0.1 ohm) or fit a smaller shunt"),
-        ("M8", "Panel speed: stopwatch over 90 deg of travel, both directions", "stopwatch + protractor/angle sensor",
-         f"{OMEGA[1]:.1f} deg/s (45 s for 90 deg)", "energy per degree = V x I / speed <= 1.5 J/deg (0.1 Wh/day for 240 deg)"),
-        ("M9", "Worm gear holds the panel with the driver asleep (push the panel by hand, 10 N at the edge)", "angle sensor",
-         "no movement, 0 mA", "angle change < 0.5 deg: confirms no holding current is needed"),
+        ("M6", "Servo on the 5 V feed, powered, holding a position with no load, and again with no pulses sent: standby current. Then gate off (P-MOSFET open)",
+         "DMM", f"standby {I_SERVO_STBY[0]:.0f}-{I_SERVO_STBY[2]:.0f} mA (listings disagree; model uses {I_SERVO_STBY[1]:.0f} mA); gated off about {I_GATE_LEAK * 1000:.0f} uA",
+         f"record the value (it sets section 4.1, case a); gated off: no visible reading on the mA range (< 0.01 mA)"),
+        ("M7", f"One small move ({DEADBAND_DEG:.0f} deg) with the panel fitted, both directions: mean current and duration; then a full return move; then the start peak",
+         "DMM 10 A range (max-hold) and sensor #3 for the mean", f"small move about {I_MOVE_TYP * 1000:.0f} mA for {T_MOVE} s = {E_MOVE[0]:.1f} J (worst {E_MOVE[1]:.0f} J); "
+         f"no load <= {I_SERVO_NOLOAD:.0f} mA; stall {I_SERVO_STALL[0]}-{I_SERVO_STALL[1]} A",
+         f"<= {E_MOVE[1]:.0f} J per small move. A stall is above the INA226 range (819 mA with 0.1 ohm): the reading clips, so use the DMM for peaks"),
+        ("M8", "Servo speed with the panel fitted: time for 90 deg of travel, both directions", "stopwatch or video + protractor/angle sensor",
+         f"{T_SERVO_60 * 1.5:.2f} s with no load ({T_SERVO_60} s per 60 deg); slower with the panel", f"<= {T_GATE_ON:.0f} s, so the {T_GATE_ON:.0f} s powered window in the model covers a move"),
+        ("M9", "Does the servo hold the panel when it is NOT powered (gate off)? Push the panel by hand, 10 N at the edge; then leave it tilted for 10 min",
+         "angle sensor", "not known: plastic spur gears are not self-locking and the clutch slips under force",
+         "angle change < 0.5 deg: gating between moves is allowed. If it moves: add a brake or a balanced mount, or accept case (a) of section 4.1"),
         ("M10", "Sensors alone on 3V3 (3x INA226 + DS3231, MCU held in reset or measured in the 3V3 feed to the modules)", "DMM",
          f"{sensors:.2f} mA at 3.3 V", f"<= {N_INA * I_INA[2] + I_RTC[2]:.2f} mA (datasheet maxima)"),
-        ("M11", "Power manager: battery-side input power against 5 V output power at about 20 mA and 100 mA load; and battery current with no load",
-         "DMM x2 (or DMM + INA226 #3)", f"efficiency about {100 * ETA_BOOST:.0f} %; no-load battery current < {I_Q_MANAGER:.0f} mA",
+        ("M11", "Power source (power bank, or Solar Power Manager): battery-side input power against 5 V output power at about 20 mA and 100 mA load; and battery current with no load (where the battery side can be reached)",
+         "DMM x2 (or DMM + sensor #3)", f"efficiency about {100 * ETA_BOOST:.0f} %; no-load battery current < {I_Q_MANAGER:.0f} mA",
          "efficiency >= 80 %; no-load current <= 2 mA"),
-        ("M12", "24 h run of the final firmware (starts 26 Nov): E_use from channel-1 field3", "INA226 #3 via ThingSpeak",
+        ("M12", "24 h run of the final firmware (starts 26 Nov): E_use from channel-1 field3", "sensor #3 via ThingSpeak",
          f"(b) {tot['b']['total_Wh_day_5V']:.2f} Wh/day as built; (c) {tot['c']['total_Wh_day_5V']:.2f} Wh/day with light sleep",
          f"within +/-20 % of the model for the firmware flashed; final design <= {target_wh:.2f} Wh/day ({target_mw:.1f} mW)"),
+        ("M13", "Power bank at low load: run the light-sleep sketch (M4) from the power bank for 30 min, servo gated off", "DMM on the 5 V feed + serial log after reconnecting",
+         f"many power banks switch off below roughly 50-100 mA; the load here is about {p_ls / V5:.0f} mA",
+         "5 V still present after 30 min with no gap in the log. If it switches off: use a bank with a low-current (always-on) mode, or the Solar Power Manager + 18650 from the BOM"),
     ]
 
     # ----------------------------------------------------------------------- figure
     INK, MUTED, SURF = "#0b0b0b", "#52514e", "#fcfcfb"
     COL = {"a": "#2a78d6", "b": "#eb6834", "c": "#1baf7a", "d": "#eda100"}   # validated categorical order
     LS = {"a": (0, (6, 2)), "b": (0, (4, 1.5, 1, 1.5)), "c": (0, (2, 1.5)), "d": (0, (1, 1))}
-    SHORT = {"a": "(a) always awake, Wi-Fi on", "b": "(b) data link as built",
+    SHORT = {"a": "(a) always awake, Wi-Fi on, servo powered", "b": "(b) data link as built",
              "c": "(c) light sleep, 15 min uploads", "d": "(d) light sleep, hourly uploads, LED cut"}
     x = np.arange(1, 13)
     fig, ax = plt.subplots(figsize=(9.2, 6.0), dpi=200)
@@ -420,11 +451,17 @@ def main():
                           "net_gain_pct_by_month": (pct(tot[k]["total_Wh_day_5V"]).round(1).tolist()),
                           "net_margin_Wh_day_by_month": (budget - tot[k]["total_Wh_day_5V"]).round(3).tolist(),
                           "sensitivity": sens[k]} for k in sc},
-        "motor": {"strategies": {str(T): {a: (float(b) if not isinstance(b, int) else b) for a, b in m.items()} for T, m in motor.items()},
-                  "best_case_Wh_day": motor_best["E_Wh"], "worst_case_Wh_day": motor_worst["E_Wh"],
-                  "assumptions": {"V": V_MOTOR, "I_A_low_central_high": I_MOTOR, "deg_per_s_low_central_high": OMEGA,
-                                  "travel_deg_per_day": TRAVEL_DEG, "start_A": I_START, "start_s": T_START}},
-        "power_manager": {"boost_efficiency": ETA_BOOST, "quiescent_mA_max": I_Q_MANAGER,
+        "servo": {"part": "DS-R001 (very probably DFRobot SER0051)", "status": "model only, nothing measured",
+                  "always_powered": ungated,
+                  "power_gated_typical": {str(int(h)): m for h, m in servo.items()},
+                  "power_gated_worst": {str(int(h)): m for h, m in servo_worst.items()},
+                  "per_scenario": servo_sc,
+                  "assumptions": {"V": V_SERVO, "standby_mA_low_central_high": I_SERVO_STBY, "no_load_mA": I_SERVO_NOLOAD,
+                                  "stall_A_5V_6V": I_SERVO_STALL, "s_per_60deg": T_SERVO_60, "stall_cut_s": T_STALL_CUT,
+                                  "E_small_move_J_typ_worst": E_MOVE, "E_return_move_J": E_RETURN,
+                                  "powered_window_s": T_GATE_ON, "gate_leak_mA": I_GATE_LEAK,
+                                  "deadband_deg": DEADBAND_DEG, "move_every_min": MOVE_EVERY_MIN}},
+        "upstream_converter": {"efficiency": ETA_BOOST, "quiescent_mA_max": I_Q_MANAGER,
                           "quiescent_Wh_day_max": manager_q_wh},
         "bench": [dict(zip(("id", "what", "instrument", "expected", "pass"), b)) for b in bench],
         "sources": {k: {"what": v[0], "url": v[1]} for k, v in SOURCES.items()},
@@ -437,9 +474,11 @@ def main():
     A("# Power budget and break-even: can the panel pay for its own movement?")
     A("")
     A("EEE3035 Group 8, Active Solar Tracker. Generated by `power_budget.py` on 19 Nov 2026; every number in this file "
-      "comes from the script (`power_budget_numbers.json` holds them unrounded). **Nothing here has been measured on our "
-      "hardware yet**: the values are datasheet figures, cited third-party measurements, or assumptions marked as such. "
-      "Section 8 lists the bench measurements for 26 Nov that replace them.")
+      "comes from the script (`power_budget_numbers.json` holds them unrounded). **This is a model. Nothing here has been "
+      "measured on our hardware yet**: the values are datasheet figures, product-listing figures, cited third-party "
+      "measurements, or assumptions marked as such. Section 8 lists the bench measurements for 26 Nov that replace them. "
+      "Changed on 19 Nov 2026: the actuator is a DS-R001 hobby servo, power-gated by the firmware (it replaces the worm-gear "
+      "motor, DRV8833 driver and limit switches assumed before), and the consumption sensor sits in the 5 V feed to the tracker.")
     A("")
     A("## 1. Answer in brief")
     A("")
@@ -453,12 +492,16 @@ def main():
         A(f"- **{SHORT[k]}**: {tot[k]['total_Wh_day_5V']:.2f} Wh/day ({tot[k]['mean_mW_5V']:.0f} mW). "
           + (f"Net loss in {len(n)} months ({', '.join(n)})" if n else "Net gain in every month")
           + f"; {sens[k]['year_net_pct']:+.0f} % over the year.")
-    A(f"- **Design target: P_use <= {target_mw:.1f} mW average ({target_wh:.2f} Wh/day)** at INA226 #3. That is the December "
+    A(f"- **Design target: P_use <= {target_mw:.1f} mW average ({target_wh:.2f} Wh/day)** at the consumption sensor (#3, in the 5 V feed). That is the December "
       f"budget divided by 1.3, so the net gain stays positive in every month even if consumption is 30 % above the model.")
-    A(f"- The motor is the smallest term if it is set up properly: {motor[10]['E_Wh']:.3f} Wh/day for 240° of travel at "
-      f"{I_MOTOR[1] * 1000:.0f} mA and {OMEGA[1]:.0f}°/s. The electronics that are on for 24 h decide the result, not the movement.")
+    A(f"- **The servo must be power-gated.** Left powered all day, its standby current alone ({I_SERVO_STBY[0]:.0f}-{I_SERVO_STBY[2]:.0f} mA at 5 V, "
+      f"listings disagree) costs {standby_wh[0]:.1f}-{standby_wh[2]:.1f} Wh/day. That is {ungated[0]['pct_of_dec_budget'] / 100:.1f} to {ungated[2]['pct_of_dec_budget'] / 100:.1f} times "
+      f"the whole December tracking gain ({budget[dec]:.2f} Wh/day), before the MCU draws anything.")
+    A(f"- **Power-gated, the servo is negligible:** about {1000 * servo[DAYLIGHT_H]['E_Wh']:.0f} mWh/day for {servo[DAYLIGHT_H]['moves_per_day']} moves "
+      f"(worst case {1000 * servo_worst[DAYLIGHT_CASES[-1]]['E_Wh']:.0f} mWh/day). The electronics that are on for 24 h then decide the result, not the movement. "
+      "Gating only works if the servo holds the panel when it is not powered. That is not known yet (bench test M9).")
     A("")
-    A("![Break-even budget by month](break_even_by_month.png)")
+    A("*Figure: run `python3 power_budget.py` in this folder to regenerate `break_even_by_month.png` (and this file).*")
     A("")
     A("*Figure: monthly break-even budget (black) against the daily consumption of the four scenarios (bands: ±30 %). "
       "Log scale. A scenario pays for itself in the months where its line lies below the black curve.*")
@@ -471,10 +514,12 @@ def main():
     A(f"2. `E_tracked` and `E_fixed` are the PVGIS 5.3 monthly means already in the repository ({pv_src}): inclined-axis "
       "tracker and fixed panel at the same tilt (39°, south), 14 % system loss, scaled to one 5.4 W FIT0330 panel.")
     A("3. `E_use` is built bottom-up: for each operating mode, current of each part x rail voltage / converter efficiency x "
-      "time in that mode. All scenario figures are **at the 5 V output of the Solar Power Manager**, which is where INA226 #3 "
-      "has to sit to see the whole tracker and nothing else (see flag F1). 3.3 V loads go through the Nano's MP2322 buck "
-      f"converter ({ETA_BUCK[1]:.2f} at normal load, {ETA_BUCK_LIGHT[1]:.2f} assumed at sleep currents).")
-    A("4. The motor is added as a separate term (section 4) so the control-code author can see what each strategy costs.")
+      "time in that mode. All scenario figures are **at the 5 V feed to the tracker** (the power-bank output), which is where the "
+      "consumption sensor (#3) sits since the wiring correction of 19 Nov, so it sees the whole tracker and nothing else (see flag F1). "
+      "P_use is measured there, so the losses of the converter upstream (inside the power bank or the power manager) are outside P_use. "
+      f"3.3 V loads go through the Nano's MP2322 buck converter ({ETA_BUCK[1]:.2f} at normal load, {ETA_BUCK_LIGHT[1]:.2f} assumed at sleep currents). "
+      "The servo is fed at 5 V from the same feed, after the sensor.")
+    A("4. The servo is added as separate terms (section 4.1): its standby current if it stays powered, and the energy of the moves.")
     A("5. Cross-check: with the repository's own `E_use` assumptions the script reproduces "
       "`docs/energy/net_gain_by_month.md` (section 5).")
     A("")
@@ -498,7 +543,7 @@ def main():
         ("", "Green power LED (hard-wired)", "1 mA", "0.5-2 mA", "3.3 V", "ASSUMED", "not in NANO datasheet"),
         ("", "MP2322 buck, 5 V to 3.3 V, normal load", "> 90 % at 4.5 V in", "85-90 % at 12 V in", "-", "DS", "NANO 11.3"),
         ("", "MP2322 buck at a few mA", "80 %", "60-90 %", "-", "ASSUMED", "not published by Arduino"),
-        ("INA226 (x3)", "Continuous conversion", "330 µA each", "420 µA each", "3.3 V", "DS", "INA 5.5"),
+        ("INA226 (x3; an INA219 board is possible, see F8)", "Continuous conversion", "330 µA each", "420 µA each", "3.3 V", "DS", "INA 5.5"),
         ("", "Power-down", "0.5 µA", "2 µA", "3.3 V", "DS", "INA 5.5"),
         ("DS3231", "I2C active (400 kHz)", "-", "200 µA at 3.63 V", "3.3 V", "DS", "RTC"),
         ("", "Standby (bus idle)", "-", "110 µA at 3.63 V", "3.3 V", "DS", "RTC"),
@@ -507,12 +552,14 @@ def main():
         ("BPX65 photodiode", "Photocurrent at 1000 lx, V_R = 5 V", "10 µA", "min 5.5 µA", "bias", "DS", "BPX"),
         ("", "Dark current, V_R = 20 V", "1 nA", "5 nA", "bias", "DS", "BPX"),
         ("", f"Arc of {N_PD} diodes in daylight, biased", "0.2 mA each", "0.01-1 mA each", "3.3 V", "ASSUMED", "count and circuit not in the repository"),
-        ("DRV8833", "Awake, outputs off (VM = 5 V)", "1.7 mA", "3 mA", "5 V", "DS", "DRV 6.5"),
-        ("", "Sleep (nSLEEP low)", "1.6 µA", "2.5 µA", "5 V", "DS", "DRV 6.5"),
-        ("", "On-resistance, high side + low side at 5 V", "200 + 160 mΩ", "-", "-", "DS", "DRV 6.5"),
-        ("Worm-gear DC motor", "Running (part not identified in the repository)", "200 mA", "80 mA (no load, 6 V type) to 1 A (stall, 12 V type)", "5 V", "ASSUMED from listings", "M6, M12"),
-        ("", "Holding", "0 mA (self-locking)", "-", "-", "listing", "M6"),
-        ("Waveshare Solar Power Manager", "Battery to 5 V boost", "about 86 %", "-", "-", "DS", "WS"),
+        ("DS-R001 servo", "Powered, not moving (standby)", f"{I_SERVO_STBY[1]:.0f} mA used", f"<= {I_SERVO_STBY[0]:.0f} mA at 6 V (SER) to <= {I_SERVO_STBY[2]:.0f} mA (DSP)", "5 V", "listing; ASSUMED centre", "SER, DSP"),
+        ("", "Running, no load", "-", f"<= {I_SERVO_NOLOAD:.0f} mA at 6 V", "5 V", "listing", "SER"),
+        ("", "Stall", f"about {I_SERVO_STALL[0]} A at 5 V", f"<= {I_SERVO_STALL[1]} A at 6 V; cut by the servo after {T_STALL_CUT:.0f} s blocked", "5 V", "listing; 5 V value scaled", "SER"),
+        ("", f"One small move ({DEADBAND_DEG:.0f}°)", f"{E_MOVE[0]:.1f} J ({I_MOVE_TYP * 1000:.0f} mA mean for {T_MOVE} s)", f"{E_MOVE[1]:.0f} J ({I_MOVE_WORST:.0f} A for {T_MOVE} s)", "5 V", "ASSUMED", "to be measured (M7)"),
+        ("", "Speed, no load", f"{T_SERVO_60} s per 60°", "-", "-", "listing", "SER"),
+        ("", "Holding when not powered", "not known", "plastic spur gears, not self-locking; clutch slips under force", "-", "to be tested (M9)", "SER"),
+        ("Servo power gate (P-MOSFET)", "Off", f"about {I_GATE_LEAK * 1000:.0f} µA", "-", "5 V", "ASSUMED", "part not chosen"),
+        ("Waveshare Solar Power Manager (in the BOM; alternative to the power bank)", "Battery to 5 V boost", "about 86 %", "-", "-", "DS", "WS"),
         ("", "Solar charging", "about 78 %", "-", "-", "DS", "WS"),
         ("", "Quiescent current", "-", "< 2 mA", "battery", "DS", "WS"),
     ]
@@ -526,20 +573,25 @@ def main():
     A("")
     A("Flags (things the model had to assume):")
     A("")
-    A("- **F1, where INA226 #3 sits.** The firmware comments call 0x44 the \"battery line\" and report its bus voltage as V_bat. "
-      "With the Solar Power Manager the battery line also carries the charging current, so a sensor there cannot separate "
-      "what the tracker draws. For P_use the sensor has to be in the 5 V (or 3.3 V) output that feeds the tracker. "
-      f"Measured at the battery instead, every figure here is divided by the boost efficiency ({ETA_BOOST:.2f}).")
+    A("- **F1, where sensor #3 sits.** Settled on 19 Nov 2026: the consumption sensor is in the 5 V feed to the tracker, so its bus "
+      "voltage (channel-1 field7, V_supply) is the supply-rail voltage, not a battery voltage. Losses upstream of that point "
+      f"(the power bank's converter, or the power manager's boost at about {ETA_BOOST:.2f}) are outside P_use. Section 6 shows what counting them would do.")
     A("- **F2, Nano ESP32 supply.** Arduino recommends 6-21 V on VIN (the cheat sheet also says keep VIN within 5-18 V), so 5 V on VIN "
       "is below the recommended range, and VBUS is not an input (it only outputs 5 V when the board is powered from USB). Feed the power "
       "manager's 5 V USB output into the Nano's USB-C port, or 3.3 V into the 3V3 pin only as Arduino describes (solder jumper), which also removes the MP2322 loss.")
     A("- **F3, BPX65 arc.** The repository does not say how many photodiodes there are or how they are read; "
       f"{N_PD} diodes reverse-biased from 3V3 are assumed. Used in photovoltaic mode (no bias) they draw nothing.")
-    A("- **F4, motor.** The part number, gear ratio, supply voltage, running current and panel speed are not in the repository. "
-      "The 2°/s is the simulator default (`ast_sim.h`).")
-    A("- **F5, panel-angle sensor and limit switches** are not in the hardware list and are not in the model. A 10 kΩ potentiometer "
-      "across 3.3 V would add 0.33 mA (about 0.03 Wh/day): power it from a GPIO during the wake window.")
+    A("- **F4, servo.** The DS-R001 figures come from product listings that disagree (standby <= 10 mA, <= 20 mA or <= 40 mA). "
+      "The energy of a move and the number of moves are assumptions. Whether the servo holds the panel when it is not powered is not known. "
+      "Running current, move time and holding are bench items M6 to M9.")
+    A("- **F5, panel-angle sensor.** With a servo the panel angle is the commanded angle unless a separate sensor is fitted; there are no limit switches. "
+      "A 10 kΩ potentiometer across 3.3 V would add 0.33 mA (about 0.03 Wh/day): power it from a GPIO during the wake window.")
     A("- **F6, board sleep currents** come from forum users, not from Arduino. They vary by a factor of two.")
+    A("- **F7, power bank.** Many power banks switch off when the load falls below roughly 50-100 mA. Light sleep draws only a few mA, "
+      "so the two clash. Use a bank with a low-current (always-on) mode, or the Waveshare Solar Power Manager with the 18650 cell from the BOM. Bench item M13.")
+    A("- **F8, power sensors.** The block diagram and the ordered BOM disagree: three INA226 or one four-channel INA219 board. The firmware detects which. "
+      "The model uses the INA226 currents; an INA219 draws more (about 0.7 mA each, 1 mA maximum; to be checked against its datasheet) and averages over at most 68 ms, "
+      "so a 0.4 s servo move can fall between two 1 Hz reads.")
     A("")
     A("## 4. Scenarios")
     A("")
@@ -547,13 +599,13 @@ def main():
         s = sc[k]
         A(f"### {s['name']}")
         A("")
-        A(f"{s['note'].capitalize()}.")
+        A(f"{s['note'][0].upper() + s['note'][1:]}.")
         A("")
         A("| Mode | Power at the 5 V rail (mW) | Share of the day | Mean (mW) | Wh/day |")
         A("|---|---|---|---|---|")
         for r in s["rows"]:
             A(f"| {r['mode']} | {r['P_mW']:.2f} | {100 * r['duty']:.2f} % | {r['mean_mW']:.2f} | {r['Wh_day']:.3f} |")
-        A(f"| Motor, one move every {MOTOR_T[k]} min (section 4.1) | | | {tot[k]['motor_Wh_day'] / 24 * 1000:.2f} | {tot[k]['motor_Wh_day']:.3f} |")
+        A(f"| Servo moves, {servo_sc[k]['moves_per_day']} a day (section 4.1) | | | {tot[k]['servo_moves_Wh_day'] / 24 * 1000:.2f} | {tot[k]['servo_moves_Wh_day']:.3f} |")
         A(f"| **Total** | | | **{tot[k]['mean_mW_5V']:.1f}** | **{tot[k]['total_Wh_day_5V']:.2f}** |")
         A("")
     A(f"Deep sleep is not the aggressive option on this board: users measure {I_DS_BOARD[0]}-{I_DS_BOARD[2]} mA for the whole board in deep sleep "
@@ -574,36 +626,59 @@ def main():
     A("")
     A("Its assumptions: 27 mA for the CPU at 80 MHz with the radio off (inside the datasheet range of 22.0-36.1 mA); 96 uploads "
       "a day of 9 s at 125 mA; 1.2 mA for 3x INA226 + DS3231 (3 x 0.33 + 0.2 = 1.19 mA, confirmed); no buck-converter loss, no power "
-      "LED, no photodiode bias, no motor driver, no motor. Adding those gives scenario (b): "
+      "LED, no photodiode bias, no actuator. Adding those gives scenario (b), with the servo power-gated: "
       f"**{tot['b']['total_Wh_day_5V']:.2f} Wh/day**, {100 * (tot['b']['total_Wh_day_5V'] / repo_as_built - 1):.0f} % more than 2.3. "
-      f"The largest additions are the converter loss ({100 * (1 / ETA_BUCK[1] - 1):.0f} %) and the DRV8833 left awake "
-      f"({V5 * I_DRV_ON[1] * 24 / 1000:.2f} Wh/day).")
+      f"The largest addition is the converter loss ({100 * (1 / ETA_BUCK[1] - 1):.0f} %). The version of this file before 19 Nov gave 3.11 Wh/day "
+      "for (b); it assumed a DRV8833 motor driver left awake (0.20 Wh/day) and a worm-gear motor, which are no longer in the design. "
+      f"With the servo left powered instead, (b) becomes {ungated[0]['totals_Wh_day']['b']:.1f} to {ungated[2]['totals_Wh_day']['b']:.1f} Wh/day.")
     A("")
-    A("### 4.1 Motor energy")
+    A("### 4.1 Servo energy")
     A("")
-    A(f"Assumptions: travel {TRAVEL_DEG:.0f}°/day (±{LIMIT_DEG:.0f}° limits: 120° sweep at 15°/h over 8 h, then 120° back), "
-      f"{V_MOTOR:.0f} V, {I_MOTOR[1] * 1000:.0f} mA running, {OMEGA[1]:.0f}°/s at the panel, start surge {I_START:.0f} A for {T_START} s, "
-      "MCU awake and DRV8833 awake only while the motor runs. No holding current: the worm gear is self-locking.")
+    A(f"The actuator is a DS-R001 hobby servo fed at {V_SERVO:.0f} V. Two cases. Both are models until M6 to M9 are measured.")
     A("")
-    A("| Move every | Moves/day | Step | Motor on (s/day) | Running (J) | Starts (J) | MCU + driver while moving (J) | **Total (Wh/day)** | Beam lost to pointing error |")
+    A("**(a) Servo always powered.** The servo draws its standby current for 24 h whether it moves or not. "
+      "The listings give three different upper limits, so all three are shown.")
+    A("")
+    A("| Standby current at 5 V | Power (mW) | **Wh/day** | Share of the December budget | Months with a net loss from the servo alone | (b) total | (c) total | (d) total | Months with a net loss, (c) |")
     A("|---|---|---|---|---|---|---|---|---|")
-    for Tm, m in motor.items():
-        A(f"| {Tm} min | {m['moves_per_day']} | {m['step_deg']:.2f}° | {m['run_s_per_day']:.0f} | {m['E_run_J']:.0f} | {m['E_start_J']:.0f} | "
-          f"{m['E_mcu_J'] + m['E_drv_J']:.0f} | **{m['E_Wh']:.3f}** | {m['cos_loss_pct']:.3f} % |")
+    for u in ungated:
+        A(f"| {u['standby_mA']:.0f} mA | {u['mW']:.0f} | **{u['Wh_day']:.1f}** | {u['pct_of_dec_budget']:.0f} % | {', '.join(u['loss_months_servo_alone'])} | "
+          f"{u['totals_Wh_day']['b']:.2f} | {u['totals_Wh_day']['c']:.2f} | {u['totals_Wh_day']['d']:.2f} | {', '.join(u['loss_months']['c'])} |")
     A("")
-    A(f"The running time is fixed by the travel and the speed, not by the interval; only the number of starts changes. "
-      f"Range: {motor_best['E_Wh']:.3f} Wh/day ({I_MOTOR[0] * 1000:.0f} mA, {OMEGA[2]:.0f}°/s) to **{motor_worst['E_Wh']:.2f} Wh/day** "
-      f"({I_MOTOR[2]:.0f} A, {OMEGA[0]}°/s), and the top of that range equals the whole December budget. Motor current and panel speed "
-      "are therefore the two numbers to measure first (M7, M8). "
-      f"DRV8833 conduction loss at {I_MOTOR[1] * 1000:.0f} mA is {motor[10]['drv_loss_mW_while_running']:.0f} mW while moving (already inside V x I). "
-      "A 15 min step leaves at most 1.9° of error and costs under 0.02 % of the beam, so stepping more often buys nothing.")
+    A(f"The December tracking gain is {budget[dec]:.2f} Wh/day. An ungated servo costs {standby_wh[0]:.1f} to {standby_wh[2]:.1f} Wh/day on its own, "
+      "so it wipes out the December gain at every listed standby figure, even with the best sleep scheme for the electronics. "
+      "The totals are the scenario totals of section 4 plus the standby energy.")
     A("")
-    A(f"Left awake all day the DRV8833 alone costs {V5 * I_DRV_ON[1] * 24 / 1000:.2f} Wh/day (1.7 mA at 5 V), "
-      f"{100 * V5 * I_DRV_ON[1] * 24 / 1000 / budget[dec]:.0f} % of the December budget and several times the motor itself.")
+    A(f"**(b) Servo power-gated.** A high-side P-MOSFET, switched from a GPIO, feeds the servo only around a move. Assumptions: the control code moves when the "
+      f"pointing error exceeds the {DEADBAND_DEG:.0f}° dead band, about one move per {MOVE_EVERY_MIN:.0f} min of daylight (sun at {SUN_RATE:.0f}°/h), plus one return move after dusk; "
+      f"a small move takes {E_MOVE[0]:.1f} J (about {I_MOVE_TYP * 1000:.0f} mA mean for {T_MOVE} s at {V_SERVO:.0f} V), worst {E_MOVE[1]:.0f} J; the return move is counted at {E_RETURN:.0f} J; "
+      f"the servo is powered for {T_GATE_ON:.0f} s per move (standby {I_SERVO_STBY[1]:.0f} mA for the rest of that second) and the MCU stays awake for it; "
+      f"gate leakage about {I_GATE_LEAK * 1000:.0f} µA ({V_SERVO * I_GATE_LEAK * 24:.2f} mWh/day, negligible).")
+    A("")
+    A("| Daylight | Moves/day | Servo powered (s/day) | Moves (J) | Standby in the powered window (J) | MCU awake for the moves (J) | **Total, typical (mWh/day)** | **Total, worst move (mWh/day)** |")
+    A("|---|---|---|---|---|---|---|---|")
+    for h in DAYLIGHT_CASES:
+        m, w = servo[h], servo_worst[h]
+        A(f"| {h:.0f} h | {m['moves_per_day']} | {m['powered_s_per_day']:.0f} | {m['E_moves_J']:.1f} | {m['E_window_J']:.1f} | {m['E_mcu_J']:.1f} | "
+          f"**{1000 * m['E_Wh']:.1f}** | **{1000 * w['E_Wh']:.1f}** |")
+    A("")
+    A(f"Gated, the servo costs a few mWh/day: {100 * servo[DAYLIGHT_CASES[0]]['E_Wh'] / budget[dec]:.1f} % of the December budget (typical, 8 h of daylight), "
+      f"{100 * servo_worst[DAYLIGHT_CASES[0]]['E_Wh'] / budget[dec]:.1f} % with the worst move figure. Gating cuts the servo's energy by a factor of about "
+      f"{round(standby_wh[0] / servo[DAYLIGHT_H]['E_Wh'], -2):.0f} to {round(standby_wh[2] / servo[DAYLIGHT_H]['E_Wh'], -2):.0f}. "
+      f"The {DEADBAND_DEG:.0f}° dead band costs at most {servo[DAYLIGHT_H]['cos_loss_pct']:.2f} % of the beam (error between 0 and {DEADBAND_DEG:.0f}°), so moving more often buys nothing.")
+    A("")
+    A("Three things can spoil case (b):")
+    A("")
+    A("- **Holding.** The servo has plastic spur gears, which are not self-locking (the worm gear was), and a clutch that slips under external force. "
+      "If the panel moves when the servo is not powered (wind, its own weight), gating between moves is not possible as it stands and case (a) applies. Bench test M9.")
+    A(f"- **A blocked servo.** At stall it draws about {I_SERVO_STALL[0]} A at 5 V ({V_SERVO * I_SERVO_STALL[0]:.0f} W) until its own protection cuts the motor after {T_STALL_CUT:.0f} s: "
+      f"about {V_SERVO * I_SERVO_STALL[0] * T_STALL_CUT:.0f} J per event, as much as {V_SERVO * I_SERVO_STALL[0] * T_STALL_CUT / servo[DAYLIGHT_H]['E_J']:.0f} typical days of moves. "
+      "The firmware should switch the gate off sooner and report fault 8.")
+    A("- **Hunting.** Every extra move costs the powered window as well as the move. Keep the dead band and do not move in state HLD.")
     A("")
     A("## 5. Break-even budget by month")
     A("")
-    A("Net gain is against the fixed panel at the same tilt; the scenario columns include the motor.")
+    A("Net gain is against the fixed panel at the same tilt; the scenario columns include the servo: powered all day in (a), power-gated in (b), (c) and (d).")
     A("")
     A("| Month | Tracked (Wh/day) | Fixed, same tilt (Wh/day) | **Break-even (Wh/day)** | **Break-even (mW avg)** | Gross gain | Net (a) | Net (b) | Net (c) | Net (d) |")
     A("|---|---|---|---|---|---|---|---|---|---|")
@@ -643,13 +718,13 @@ def main():
     A("")
     A("Months with a net loss (blank = gain in every month):")
     A("")
-    A("| Scenario | Wh/day | Same tilt, -30 % | Same tilt, nominal | Same tilt, +30 % | Flat reference, nominal | Flat reference, +30 % | Measured at the battery (/0.86) | Battery, +30 % | Dec headroom |")
+    A("| Scenario | Wh/day | Same tilt, -30 % | Same tilt, nominal | Same tilt, +30 % | Flat reference, nominal | Flat reference, +30 % | Counting the upstream converter (/0.86) | Upstream, +30 % | Dec headroom |")
     A("|---|---|---|---|---|---|---|---|---|---|")
     j = lambda m: ", ".join(m)
     for k in keys + ["d_deep"]:
         s = sens[k]
         A(f"| ({k.replace('_', '-')}) | {tot[k]['total_Wh_day_5V']:.2f} | {j(s['same_tilt']['-30%'])} | {j(s['same_tilt']['nominal'])} | {j(s['same_tilt']['+30%'])} | "
-          f"{j(s['flat_ref']['nominal'])} | {j(s['flat_ref']['+30%'])} | {j(s['battery_side']['nominal'])} | {j(s['battery_side']['+30%'])} | {s['worst_month_headroom_pct']:+.0f} % |")
+          f"{j(s['flat_ref']['nominal'])} | {j(s['flat_ref']['+30%'])} | {j(s['upstream_of_converter']['nominal'])} | {j(s['upstream_of_converter']['+30%'])} | {s['worst_month_headroom_pct']:+.0f} % |")
     A("")
     A(f"- **Reference panel flat instead of tilted.** The budget rises to {budget_flat[dec]:.2f} Wh/day in December ({budget_flat[dec] / 24 * 1000:.0f} mW) and "
       f"{budget_flat[jun]:.2f} in June, so even scenario (b) shows a gain in "
@@ -658,11 +733,16 @@ def main():
     A(f"- **Consumption ±30 %.** (d) stays positive in every month at +30 % (December headroom {sens['d']['worst_month_headroom_pct']:+.0f} %). "
       f"(c) has {sens['c']['worst_month_headroom_pct']:+.0f} % December headroom"
       + (", so +30 % turns December negative." if sens['c']['same_tilt']['+30%'] else ", which survives +30 %."))
-    A(f"- **Where the sensor sits.** At the battery every figure is 1/{ETA_BOOST} = {1 / ETA_BOOST:.2f} times larger. The power manager's own quiescent current "
-      f"(< {I_Q_MANAGER:.0f} mA, at most {manager_q_wh:.2f} Wh/day) is not charged to the tracker here because a fixed panel with a battery needs the same module; "
-      f"if the group decides to count it, add up to {manager_q_wh:.2f} Wh/day to every scenario: December is then "
+    A(f"- **Servo left powered.** See section 4.1: (c) rises from {tot['c']['total_Wh_day_5V']:.2f} to {ungated[0]['totals_Wh_day']['c']:.2f}-{ungated[2]['totals_Wh_day']['c']:.2f} Wh/day "
+      f"and shows a net loss in {len(ungated[0]['loss_months']['c'])} to {len(ungated[2]['loss_months']['c'])} months. No other single assumption moves the result as much.")
+    A(f"- **Upstream converter.** P_use is measured at the 5 V feed, so the loss of the converter that makes the 5 V is outside P_use. If the group decides to count it, "
+      f"every figure is 1/{ETA_BOOST} = {1 / ETA_BOOST:.2f} times larger (86 % is the Solar Power Manager's figure; a power bank is assumed to be similar). "
+      f"The power manager's own quiescent current (< {I_Q_MANAGER:.0f} mA, at most {manager_q_wh:.2f} Wh/day) is not charged to the tracker either, because a fixed panel with a battery needs the same module; "
+      f"with both counted, December is "
       + "; ".join(f"({k}) {budget[dec] - tot[k]['total_Wh_day_5V'] / ETA_BOOST - manager_q_wh:+.2f} Wh/day" for k in ("c", "d"))
-      + " at the battery, so measure the real quiescent current (M11).")
+      + ", so measure the real figures (M11).")
+    A("- **Power bank switching off.** Many power banks switch off when the load falls below roughly 50-100 mA. Scenarios (c) and (d) draw a few mA, so an ordinary bank may cut the supply "
+      "(flag F7, bench item M13). Adding a dummy load to keep it on would cost far more than the December budget (50 mA at 5 V is 6 Wh/day).")
     A("- **PVGIS is a long-term monthly mean.** Single overcast days have almost no beam and no tracking gain; the lab weeks (late Nov, Dec) sit at the bottom of the curve.")
     A("")
     A("## 7. Design rules for the control code")
@@ -684,23 +764,26 @@ def main():
       f"{sc['d']['rows'][2]['Wh_day']:.2f} Wh/day. Use 15 min while F8 stands; ask for F8 to be relaxed to 60 min for the winter months. "
       f"Each upload must stay under {mode_power_5v(I_UPLOAD[1], 0, ETA_BUCK[1]) * T_UPLOAD_S / 1000:.1f} J: cut `kRadioLeadS` from 8 s once the real hotspot join time is known, "
       "and never leave the radio on waiting for NTP.")
-    A("5. **Motor duty.** Move at most once every 10-15 min (dead-band 2.5-3.75°), one continuous move per step, no hunting: a second move within "
-      "5 min of the last is forbidden unless the error exceeds 5°. One return move after dusk. Do not move when the arc reports no clear sun (state HLD). "
-      f"Budget: motor-on time x motor power <= 360 J/day (0.1 Wh), i.e. <= 1.5 J per degree.")
-    A("6. **DRV8833 nSLEEP on a GPIO, low except during a move.** Raise it, wait 1 ms, move, lower it. Left high it costs "
-      f"{V5 * I_DRV_ON[1] * 24 / 1000:.2f} Wh/day. Hold the GPIO state through light sleep (`gpio_hold_en`) or fit a pull-down.")
+    A(f"5. **Servo duty.** Move only when the pointing error exceeds the {DEADBAND_DEG:.0f}° dead band (about one move per {MOVE_EVERY_MIN:.0f} min in clear sun), one move per step, no hunting. "
+      "One return move after dusk. Do not move when the arc reports no clear sun (state HLD). Keep the angle command inside the safe range (fault 7 if it is not). "
+      f"Budget: <= {E_MOVE[1]:.0f} J per small move and <= {servo_worst[DAYLIGHT_CASES[-1]]['E_J']:.0f} J/day for all moves.")
+    A(f"6. **Power-gate the servo: P-MOSFET in its 5 V feed, off except during a move.** Switch it on, wait for the servo to start, send the pulse, wait for the move to end, switch it off "
+      f"(about {T_GATE_ON:.0f} s in all). Left on, the servo costs {standby_wh[0]:.1f}-{standby_wh[2]:.1f} Wh/day. A 3.3 V GPIO cannot switch off a P-MOSFET whose source is at 5 V on its own, "
+      "and no Nano ESP32 pin is 5 V tolerant: drive the gate through a small N-MOSFET or NPN transistor with a pull-up to 5 V, so that the default state is off. "
+      "Hold the GPIO state through light sleep (`gpio_hold_en`). If the servo stalls, switch the gate off and report fault 8 rather than wait for its 5 s protection. "
+      "Gate only if bench test M9 shows that the panel stays put when the servo is not powered.")
     A("7. **Gate everything else.** BPX65 bias (and any angle potentiometer) from a GPIO that is high only in the wake window, or run the photodiodes "
       "unbiased. LEDs off (done); cut the green power LED for the outdoor unit. USB unplugged in every energy test.")
-    A("8. **Stay awake only while the motor runs,** and call `telemetry_set_motor_running()` around the move. With light sleep the INTERFACE.md rule "
+    A("8. **Stay awake only while the servo moves,** and call `telemetry_set_motor_running()` (the name in INTERFACE.md) around the move. With light sleep the INTERFACE.md rule "
       "\"call at least once per second or the data link reports IDL after 5 s\" has to be changed to match the 15 s wake: agree this with the data-link owner before coding.")
     A("9. **Check with the device itself.** `P_use` (field 3) over 24 h must come out at or below "
       f"{target_wh:.2f} Wh/day; above {budget[dec]:.2f} Wh/day the December demonstration shows a net loss whatever the pointing accuracy.")
     A("")
-    A("## 8. Bench measurements for 26 Nov (INA226 #3 and a DMM)")
+    A("## 8. Bench measurements for 26 Nov (sensor #3 and a DMM)")
     A("")
-    A("Power the tracker from the 5 V output with USB unplugged. INA226 #3 with the 0.1 Ω shunt resolves 25 µA (2.5 µV per bit); use the DMM for "
-      "the sleep currents, `cal` for an instantaneous INA226 reading, and ThingSpeak field 3 (one-minute means) for bursts and 24 h energy "
-      "(the `power` command prints CPU MHz, Wi-Fi state and radio-on seconds; it does not stream INA226 readings).")
+    A("Power the tracker from the 5 V feed with the laptop USB unplugged. Sensor #3 is an INA226 or an INA219 (the firmware detects which). An INA226 with the 0.1 Ω shunt "
+      "resolves 25 µA (2.5 µV per bit); an INA219 resolves 0.1 mA. Use the DMM for the sleep currents, `cal` for an instantaneous sensor reading, and ThingSpeak field 3 "
+      "(one-minute means) for bursts and 24 h energy (the `power` command prints CPU MHz, Wi-Fi state and radio-on seconds; it does not stream sensor readings).")
     A("")
     A("| # | Measurement | Instrument | Expected (model) | Pass threshold |")
     A("|---|---|---|---|---|")
@@ -708,7 +791,8 @@ def main():
         A("| " + " | ".join(b) + " |")
     A("")
     A("After the session, replace the constants at the top of `power_budget.py` with the measured values (M2 to `I_MS80`, M3 to `I_UPLOAD`/`T_UPLOAD_S`, "
-      "M4/M5 to `I_LS_BOARD`/`I_DS_BOARD`, M6 to `I_DRV_ON`, M7/M8 to `I_MOTOR`/`OMEGA`, M11 to `ETA_BOOST`) and run it again.")
+      "M4/M5 to `I_LS_BOARD`/`I_DS_BOARD`, M6 to `I_SERVO_STBY`, M7/M8 to `I_MOVE_TYP`/`T_MOVE`/`T_GATE_ON`, M11 to `ETA_BOOST`) and run it again. "
+      "If M9 fails, set `SERVO_GATED` to False for every scenario.")
     A("")
     (HERE / "power_budget.md").write_text("\n".join(L) + "\n")
 
@@ -717,10 +801,12 @@ def main():
     print("Break-even (mW):    ", " ".join(f"{m} {b:.0f}" for m, b in zip(MONTHS, budget_mw)))
     print(f"Repo as-built reproduction: {repo_as_built:.3f} Wh/day; cross-check found={check['found']} mismatches={len(check['mismatches'])}")
     for k in sc:
-        print(f"{k:7s} elec {tot[k]['electronics_Wh_day']:.3f} + motor {tot[k]['motor_Wh_day']:.3f} = {tot[k]['total_Wh_day_5V']:.3f} Wh/day "
+        print(f"{k:7s} elec {tot[k]['electronics_Wh_day']:.3f} + servo moves {tot[k]['servo_moves_Wh_day']:.4f} = {tot[k]['total_Wh_day_5V']:.3f} Wh/day "
               f"({tot[k]['mean_mW_5V']:.1f} mW); loss months: {sens[k]['same_tilt']['nominal']} ; +30 %: {sens[k]['same_tilt']['+30%']}; "
-              f"battery: {sens[k]['battery_side']['nominal']}; Dec headroom {sens[k]['worst_month_headroom_pct']:+.0f} %")
-    print("Motor Wh/day:", {T: round(m['E_Wh'], 4) for T, m in motor.items()}, "best", round(motor_best['E_Wh'], 4), "worst", round(motor_worst['E_Wh'], 3))
+              f"upstream: {sens[k]['upstream_of_converter']['nominal']}; Dec headroom {sens[k]['worst_month_headroom_pct']:+.0f} %")
+    print("Servo always powered, Wh/day:", [round(w, 2) for w in standby_wh],
+          "| power-gated, mWh/day typical:", {h: round(1000 * m['E_Wh'], 2) for h, m in servo.items()},
+          "worst:", {h: round(1000 * m['E_Wh'], 2) for h, m in servo_worst.items()})
     print(f"Design target: {target_mw:.1f} mW = {target_wh:.3f} Wh/day")
 
 
