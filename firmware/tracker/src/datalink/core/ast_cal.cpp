@@ -77,9 +77,11 @@ const char* ina_chip_name(InaChip c) {
 
 InaChip ina_identify(bool mfg_ok, uint16_t mfg_id, bool die_ok, uint16_t die_id, bool cfg_ok, uint16_t cfg_reset) {
   if (mfg_ok && mfg_id == 0x5449) {
-    // A TI part with the INA226 register map. The INA3221 also reports "TI"
-    // but has a different map: refuse it rather than read nonsense.
-    if (die_ok && die_id == 0x3220) return InaChip::kNone;
+    // A TI part. Only the INA226 die (0x226x, low nibble = revision) has the
+    // register map used here; the INA3221 (0x3220), INA260 (0x2270) and others
+    // also report "TI" and are refused rather than read as nonsense. If the
+    // die id cannot be read, assume an INA226 (some clones do not answer it).
+    if (die_ok && (die_id & 0xFFF0u) != 0x2260u) return InaChip::kNone;
     return InaChip::kIna226;
   }
   if (cfg_ok && cfg_reset == 0x399F) return InaChip::kIna219;

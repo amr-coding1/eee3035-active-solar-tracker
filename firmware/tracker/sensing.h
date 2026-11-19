@@ -21,6 +21,8 @@ struct Sun {
   bool valid = false;       // sun_deg can be used
   bool dark = false;        // too little light (night, lamp off)
   bool saturated = false;   // a channel is clipped at about 3.1 V (lower the load resistor)
+  bool diffuse = false;     // light without a clear direction (cloud, room light): hold
+  bool poor_fit = false;    // readings do not fit one light direction (dead or shaded sensor?)
   float sun_deg = 0.0f;     // light direction on the tracking axis, east negative
   float mv[4] = {0, 0, 0, 0};   // raw channel readings (mV)
   float total_mv = 0.0f;    // sum of corrected readings

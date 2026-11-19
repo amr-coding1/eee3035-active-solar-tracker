@@ -6,85 +6,59 @@ namespace ast {
 
 namespace {
 
-constexpr double kPi = 3.14159265358979323846;
-inline double rad(double deg) { return deg * kPi / 180.0; }
-inline double deg_of(double r) { return r * 180.0 / kPi; }
-
-// Solves the 3x3 system m * x = v by Gaussian elimination with partial
-// pivoting. Returns false when the matrix is (nearly) singular.
-bool solve3(double m[3][3], double v[3], double x[3]) {
-  for (int col = 0; col < 3; ++col) {
-    int piv = col;
-    for (int r = col + 1; r < 3; ++r) {
-      if (fabs(m[r][col]) > fabs(m[piv][col])) piv = r;
-    }
-    if (fabs(m[piv][col]) < 1e-9) return false;
-    if (piv != col) {
-      for (int k = 0; k < 3; ++k) {
-        const double t = m[col][k];
-        m[col][k] = m[piv][k];
-        m[piv][k] = t;
-      }
-      const double t = v[col];
-      v[col] = v[piv];
-      v[piv] = t;
-    }
-    for (int r = col + 1; r < 3; ++r) {
-      const double f = m[r][col] / m[col][col];
-      for (int k = col; k < 3; ++k) m[r][k] -= f * m[col][k];
-      v[r] -= f * v[col];
-    }
-  }
-  for (int r = 2; r >= 0; --r) {
-    double acc = v[r];
-    for (int k = r + 1; k < 3; ++k) acc -= m[r][k] * x[k];
-    x[r] = acc / m[r][r];
-  }
-  return true;
+// Response of one photodiode to light arriving `off_deg` away from where it
+// faces: cos^k, and nothing from behind. Single precision on purpose: the
+// ESP32-S3 has a hardware FPU for float only, and the fit below calls this
+// about 900 times per estimate.
+float response(float off_deg, float k) {
+  const float c = cosf(off_deg * 0.017453292f);
+  if (c <= 0.0f) return 0.0f;
+  return k == 1.0f ? c : powf(c, k);
 }
 
 struct Fit {
   bool ok = false;
-  double theta_deg = 0, amp = 0, ambient = 0, rms = 0;
+  float amp = 0, ambient = 0, rms = 0;
 };
 
-// Least-squares fit of s = a cos(phi) + b sin(phi) + c over the sensors in
-// `use` (c fixed at 0 when with_ambient is false).
-Fit fit_cosine(const double* s, const double* phi_deg, const bool* use, int n, bool with_ambient) {
+// For one candidate direction: least squares of s_i = A r_i + B over the
+// sensors in `use` (B fixed at 0 when fewer than three are used).
+Fit fit_at(float theta, const float* s, const float* phi, const bool* use, int n, float k) {
   Fit f;
-  double m[3][3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-  double v[3] = {0, 0, 0};
-  int count = 0;
+  float sc = 0, sc2 = 0, ss = 0, scs = 0;
+  int m = 0;
+  float r[kSunMaxSensors];
+  for (int i = 0; i < n; ++i) {
+    r[i] = 0.0f;
+    if (!use[i]) continue;
+    r[i] = response(theta - phi[i], k);
+    sc += r[i];
+    sc2 += r[i] * r[i];
+    ss += s[i];
+    scs += r[i] * s[i];
+    ++m;
+  }
+  if (m < 2) return f;
+  const float mf = static_cast<float>(m);
+  if (m >= 3) {
+    const float det = mf * sc2 - sc * sc;
+    if (fabsf(det) < 1e-6f) return f;
+    f.amp = (mf * scs - sc * ss) / det;
+    f.ambient = (ss - f.amp * sc) / mf;
+  } else {
+    if (sc2 < 1e-6f) return f;
+    f.amp = scs / sc2;
+    f.ambient = 0.0f;
+  }
+  if (!(f.amp > 0.0f)) return f;   // light from the opposite side: not this direction
+  float sq = 0;
   for (int i = 0; i < n; ++i) {
     if (!use[i]) continue;
-    const double row[3] = {cos(rad(phi_deg[i])), sin(rad(phi_deg[i])), with_ambient ? 1.0 : 0.0};
-    for (int r = 0; r < 3; ++r) {
-      for (int k = 0; k < 3; ++k) m[r][k] += row[r] * row[k];
-      v[r] += row[r] * s[i];
-    }
-    ++count;
+    const float d = s[i] - (f.amp * r[i] + f.ambient);
+    sq += d * d;
   }
-  if (!with_ambient) {
-    // Two unknowns: make the third equation trivial (c = 0).
-    m[2][0] = m[2][1] = m[0][2] = m[1][2] = 0.0;
-    m[2][2] = 1.0;
-    v[2] = 0.0;
-  }
-  if (count < (with_ambient ? 3 : 2)) return f;
-  double x[3] = {0, 0, 0};
-  if (!solve3(m, v, x)) return f;
-  f.amp = sqrt(x[0] * x[0] + x[1] * x[1]);
-  if (!(f.amp > 0.0) || !isfinite(f.amp)) return f;
-  f.theta_deg = deg_of(atan2(x[1], x[0]));
-  f.ambient = x[2];
-  double sq = 0;
-  for (int i = 0; i < n; ++i) {
-    if (!use[i]) continue;
-    const double model = x[0] * cos(rad(phi_deg[i])) + x[1] * sin(rad(phi_deg[i])) + x[2];
-    sq += (s[i] - model) * (s[i] - model);
-  }
-  f.rms = sqrt(sq / count);
-  f.ok = isfinite(f.theta_deg);
+  f.rms = sqrtf(sq / mf);
+  f.ok = isfinite(f.rms) && isfinite(f.amp);
   return f;
 }
 
@@ -104,8 +78,8 @@ SunEstimate estimate_sun(const float* raw_mv, const SunArcConfig& cfg) {
     e.why = "fewer than 2 sensors configured";
     return e;
   }
-  double s[kSunMaxSensors];
-  double phi[kSunMaxSensors];
+  float s[kSunMaxSensors];
+  float phi[kSunMaxSensors];
   bool clipped[kSunMaxSensors];
   int n_clipped = 0;
   double total = 0;
@@ -118,9 +92,9 @@ SunEstimate estimate_sun(const float* raw_mv, const SunArcConfig& cfg) {
     clipped[i] = raw >= static_cast<double>(cfg.saturated_mv);
     if (clipped[i]) ++n_clipped;
     const double c = static_cast<double>(cfg.gain[i]) * (raw - static_cast<double>(cfg.dark_offset_mv[i]));
-    s[i] = c > 0.0 ? c : 0.0;
-    phi[i] = static_cast<double>(cfg.sensor_deg[i]);
-    total += s[i];
+    s[i] = c > 0.0 ? static_cast<float>(c) : 0.0f;
+    phi[i] = cfg.sensor_deg[i];
+    total += static_cast<double>(s[i]);
   }
   e.total_mv = static_cast<float>(total);
   e.saturated = n_clipped > 0;
@@ -135,99 +109,93 @@ SunEstimate estimate_sun(const float* raw_mv, const SunArcConfig& cfg) {
     e.why = "saturated: lower the photodiode load resistor";
     return e;
   }
+  int brightest = 0;
+  float floor_mv = s[0];
+  for (int i = 1; i < n; ++i) {
+    brightest = s[i] > s[brightest] ? i : brightest;
+    floor_mv = s[i] < floor_mv ? s[i] : floor_mv;
+  }
 
   if (cfg.method == SunMethod::kCentroid) {
     // Remove the common (ambient) level first so that diffuse light does not
     // pull the estimate to the middle of the arc.
-    double floor_mv = s[0];
-    for (int i = 1; i < n; ++i) floor_mv = s[i] < floor_mv ? s[i] : floor_mv;
-    double w = 0, acc = 0;
+    const float peak_mv = s[brightest];
+    e.amplitude_mv = peak_mv - floor_mv;
+    e.ambient_mv = floor_mv;
+    e.contrast = peak_mv > 0.0f ? (peak_mv - floor_mv) / peak_mv : 0.0f;
+    e.used = static_cast<uint8_t>(n);
+    if (e.amplitude_mv < cfg.min_amplitude_mv || e.contrast < cfg.min_contrast) {
+      e.diffuse = true;
+      e.why = "diffuse light: no clear direction";
+      return e;
+    }
+    float w = 0, acc = 0;
     for (int i = 0; i < n; ++i) {
       w += s[i] - floor_mv;
       acc += (s[i] - floor_mv) * phi[i];
     }
-    if (!(w > 0.0)) {
-      // Every sensor sees the same light: the source is straight above the
-      // middle of the arc (or the light is completely diffuse).
-      double mid = 0;
-      for (int i = 0; i < n; ++i) mid += phi[i];
-      e.sun_deg = static_cast<float>(mid / n);
-    } else {
-      e.sun_deg = static_cast<float>(acc / w);
-    }
-    e.used = static_cast<uint8_t>(n);
-    e.valid = fabs(static_cast<double>(e.sun_deg)) <= static_cast<double>(cfg.max_abs_deg);
+    e.sun_deg = acc / w;
+    e.valid = fabsf(e.sun_deg) <= cfg.max_abs_deg;
     e.why = e.valid ? "" : "outside the field of view";
     return e;
   }
 
-  // Cosine fit. Start from the brightest sensor's direction and use the
-  // sensors that face it (clipped ones only if too few are left), fit, then
-  // repeat with the sensors that face the fitted direction until the set
-  // stops changing. With only two sensors left, the ambient level is taken as
-  // the smallest signal (a sensor facing away sees only ambient light) and
-  // the two-parameter fit is used.
-  int brightest = 0;
-  for (int i = 1; i < n; ++i) brightest = s[i] > s[brightest] ? i : brightest;
-  double ambient_floor = s[0];
-  for (int i = 1; i < n; ++i) ambient_floor = s[i] < ambient_floor ? s[i] : ambient_floor;
-  double theta = phi[brightest];
+  // Model fit: try every direction from -90 to +90 deg in 1 deg steps, then
+  // refine around the best in 0.05 deg steps. For each direction the model is
+  // linear in A and B, so each try is a small least-squares solve. Sensors
+  // facing away read only ambient light (response 0), which the model covers,
+  // so no sensor has to be dropped. A clipped channel is left out.
   bool use[kSunMaxSensors];
-  int count = 0;
-  Fit f;
-  bool have_fit = false;
-  for (int iter = 0; iter < 5; ++iter) {
-    bool next[kSunMaxSensors];
-    int kept = 0, kept_unclipped = 0;
-    for (int i = 0; i < n; ++i) {
-      next[i] = fabs(static_cast<double>(angle_diff_deg(static_cast<float>(theta), static_cast<float>(phi[i])))) <
-                static_cast<double>(cfg.face_limit_deg);
-      if (next[i]) {
-        ++kept;
-        if (!clipped[i]) ++kept_unclipped;
+  int m = 0;
+  for (int i = 0; i < n; ++i) {
+    use[i] = !clipped[i];
+    if (use[i]) ++m;
+  }
+  const float k = cfg.response_power > 0.0f ? cfg.response_power : 1.0f;
+  Fit best;
+  float best_theta = 0;
+  for (int pass = 0; pass < 2; ++pass) {
+    const float lo = pass == 0 ? -90.0f : best_theta - 1.0f;
+    const float step = pass == 0 ? 1.0f : 0.05f;
+    const int steps = pass == 0 ? 181 : 41;
+    for (int j = 0; j < steps; ++j) {
+      const float theta = lo + step * static_cast<float>(j);
+      const Fit f = fit_at(theta, s, phi, use, n, k);
+      if (f.ok && (!best.ok || f.rms < best.rms)) {
+        best = f;
+        best_theta = theta;
       }
     }
-    if (kept_unclipped >= 2) {   // leave clipped sensors out when possible
-      for (int i = 0; i < n; ++i) next[i] = next[i] && !clipped[i];
-      kept = kept_unclipped;
-    }
-    if (kept < 2) break;
-    bool changed = !have_fit;
-    for (int i = 0; i < n; ++i) {
-      if (have_fit && next[i] != use[i]) changed = true;
-      use[i] = next[i];
-    }
-    count = kept;
-    if (!changed) break;
-    Fit g;
-    if (count >= 3) {
-      g = fit_cosine(s, phi, use, n, true);
-    } else {
-      double s2[kSunMaxSensors];
-      for (int i = 0; i < n; ++i) s2[i] = s[i] - ambient_floor;
-      g = fit_cosine(s2, phi, use, n, false);
-      g.ambient = ambient_floor;
-    }
-    if (!g.ok) break;
-    f = g;
-    have_fit = true;
-    theta = f.theta_deg;
+    if (!best.ok) break;
   }
-  if (!have_fit) {
-    // Degenerate geometry (e.g. only one sensor lit): fall back to the
-    // brightest sensor's direction.
-    e.sun_deg = static_cast<float>(phi[brightest]);
-    e.used = 1;
-    e.valid = fabs(static_cast<double>(e.sun_deg)) <= static_cast<double>(cfg.max_abs_deg);
-    e.why = e.valid ? "" : "outside the field of view";
+  e.used = static_cast<uint8_t>(m);
+  if (!best.ok) {
+    e.diffuse = true;
+    e.why = "diffuse light: no clear direction";
     return e;
   }
-  e.sun_deg = static_cast<float>(f.theta_deg);
-  e.amplitude_mv = static_cast<float>(f.amp);
-  e.ambient_mv = static_cast<float>(f.ambient);
-  e.residual_mv = static_cast<float>(f.rms);
-  e.used = static_cast<uint8_t>(count);
-  if (fabs(f.theta_deg) > static_cast<double>(cfg.max_abs_deg)) {
+  e.sun_deg = best_theta;
+  e.amplitude_mv = best.amp;
+  e.ambient_mv = best.ambient;
+  e.residual_mv = best.rms;
+  const float amb = best.ambient > 0.0f ? best.ambient : 0.0f;
+  e.contrast = best.amp / (best.amp + amb);
+  if (best.amp < cfg.min_amplitude_mv || e.contrast < cfg.min_contrast) {
+    e.diffuse = true;
+    e.why = "diffuse light: no clear direction";
+    return e;
+  }
+  // Signs of a sensor fault rather than a light direction: a large misfit; a
+  // clearly negative ambient level (the fit bending round a dead channel); or
+  // a direction far from the brightest sensor.
+  const float neg_limit = -(best.amp * 0.1f > 20.0f ? best.amp * 0.1f : 20.0f);
+  const float from_brightest = fabsf(angle_diff_deg(best_theta, phi[brightest]));
+  if (best.rms > cfg.max_misfit * best.amp || best.ambient < neg_limit || from_brightest > 60.0f) {
+    e.poor_fit = true;
+    e.why = "readings do not fit one light direction (sensor fault, or set the response power)";
+    return e;
+  }
+  if (fabsf(best_theta) > cfg.max_abs_deg) {
     e.why = "outside the field of view";
     return e;
   }

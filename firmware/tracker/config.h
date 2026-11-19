@@ -34,6 +34,10 @@ constexpr int kSunSamples = 16;          // ADC readings averaged per channel pe
 constexpr float kSunDarkMv = 40.0f;      // all channels together below this = dark
 constexpr float kSunSaturatedMv = 3000.0f;   // the ADC clips at about 3.1 V
 constexpr float kSunMaxAbsDeg = 70.0f;   // light further out than this is not trusted
+constexpr float kSunResponsePower = 1.0f;  // cos^k response: 1 bare photodiode; `sun` shows which k fits better
+constexpr float kSunMinContrast = 0.15f;   // beam / (beam + ambient) below this = diffuse light: hold
+constexpr float kSunMaxMisfit = 0.30f;     // misfit / beam above this = readings do not fit (sensor fault?)
+constexpr uint32_t kSunFaultMs = 30000;    // poor fit for this long while lit = fault 5
 
 // ---- panel angle pot (optional, catches a slipping servo clutch) -----------------
 constexpr float kPotMvAtMinus45 = 800.0f;    // read both with `pot` at -45 and +45 deg (inclinometer)
@@ -50,8 +54,13 @@ constexpr float kServoLimitDeg = 50.0f;      // never commanded beyond +/-50 deg
 constexpr float kServoSlewDegPerS = 30.0f;   // gentle ramp: smaller current spikes on the power bank
 constexpr uint32_t kServoPowerOnMs = 150;    // pulses at the old angle after switching on
 constexpr uint32_t kServoSettleMs = 400;     // pulses held at the target before switching off
+constexpr uint32_t kServoStopMs = 40;        // pulses stopped, supply still on, before switching off
 
 // ---- tracking (Control) --------------------------------------------------------------
+// false: after every boot the servo stays OFF until you type `servo auto` (or
+// `servo <deg>`), so nothing moves before the direction, level and limits
+// have been checked on the bench. Set true for unattended runs.
+constexpr bool kStartTracking = false;
 constexpr float kDeadbandDeg = 5.0f;         // F2a: re-point when more than 5 deg off
 constexpr float kTrackLimitDeg = 45.0f;      // F2b: tracking range +/-45 deg
 constexpr float kStowDeg = -45.0f;           // F3b: idle position (east, ready for sunrise)
@@ -60,8 +69,11 @@ constexpr uint32_t kMinMoveGapMs = 10000;    // never re-point more often than e
 constexpr float kSunFilterAlpha = 0.3f;      // smoothing of the sun angle (1 = none)
 
 // ---- protection ------------------------------------------------------------------------
-constexpr float kStallLimitMw = 4000.0f;     // P_use above this while moving ...
-constexpr uint32_t kStallMs = 2500;          // ... for this long = servo stalled (fault 8)
+// Stall (fault 8): energy drawn above the pre-move level, over the move and
+// 1.5 s after it, beyond base + per-degree allowance. A jammed 5 deg move at
+// the DS-R001's ~7 W stall costs about 5 J; a free one a few tenths.
+constexpr float kStallBaseJ = 1.5f;
+constexpr float kStallJPerDeg = 0.06f;
 constexpr uint32_t kFaultShowMs = 2000;      // a short fault (7) is reported this long so the minute records it
 
 // ---- timing -----------------------------------------------------------------------------

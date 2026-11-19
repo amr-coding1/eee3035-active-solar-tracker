@@ -61,10 +61,10 @@ Goal: every subsystem working together on the bench under a lamp, with data on t
 
 | Step | What | Pass | Who |
 |---|---|---|---|
-| W1 | Flash `firmware/tracker` (`firmware/build.sh upload <port>` or the IDE). Boot log: I2C scan, chip at each address, servo line | 3 power sensors (+ DS3231) answer; addresses match `config.h` | AM |
+| W1 | Flash `firmware/tracker` (`firmware/build.sh upload <port>` or the IDE). Boot log: I2C scan, chip at each address, servo line. The servo stays off until `servo <deg>` or `servo auto` | 3 power sensors (+ DS3231) answer; addresses match `config.h` | AM |
 | W2 | `status`, `time`: clock valid (DS3231 or NTP over the hotspot) | `valid=yes` | AM |
 | W3 | `cal`: each sensor reads the panel or feed it is wired to; shunts set (`cal <ch> shunt <ohms>`) | sensible V and mA; P_use about 0.6–0.9 W with the board awake | AA + AM |
-| W4 | Photodiodes: lamp on, `sun`; cover all, `sun cal dark`; paper over them, `sun cal flat`; move the lamp, `sun` again | no SATURATED; estimate moves the right way (east negative) | CO |
+| W4 | Photodiodes: lamp on, `sun`; cover all, `sun cal dark`; paper over them, `sun cal flat`; lamp at known angles (inclinometer/protractor), `sun` at each; set `kSunResponsePower` if cos^2 fits better | no SATURATED; estimate within about 5 deg, east negative | CO |
 | W5 | Servo by hand: `servo 0` (inclinometer: level), `servo test` (8 s at each of -45 ... +45). Note commanded vs measured; set `kServoTrimDeg` and, if reversed, `kServoWestIsHigherPulse`; reflash | error within ±2 deg after trim; no reset when the servo starts | CH + CO |
 | W6 | M6–M9 (servo standby current, move energy, speed, unpowered holding), see S6 | results in the table | CH + AA |
 | W7 | Tracking: `servo auto`, `live on`; move the lamp slowly across; lamp off for 1 min; lamp on | panel follows in about 5 deg steps; IDL then STW at -45 in the dark; tracks again | CO + all |

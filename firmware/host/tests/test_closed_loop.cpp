@@ -7,6 +7,8 @@
 // lamp goes off and the panel must stow.
 #include <math.h>
 
+#include <initializer_list>
+
 #include <string>
 #include <vector>
 
@@ -38,6 +40,13 @@ struct Twin {
   double gains[4] = {1.008, 0.993, 1.004, 0.995};   // 1 % mismatch after `sun cal flat`
   unsigned seed = 2026;
   uint32_t moves_requested = 0;
+  uint32_t stall_trips = 0;
+  float move_deg = 0;
+  // Consumption sensor as an INA226 sees it: the average of each second,
+  // reported once a second. MCU 130 mW; servo powered and still 0.3 W, while
+  // the pulse ramps 1.0 W (a free move).
+  double use_acc_mj = 0;
+  float use_reading_mw = 130.0f;
   double trk_mwh = 0, fix_mwh = 0;
   int64_t t0_unix = 1795046400;   // 2026-11-19 00:00:00 UTC
 
@@ -66,6 +75,12 @@ struct Twin {
     for (uint32_t t = t_start; t < t_end; t += 10) {
       const ServoSequencer::Output o = servo.tick(t);
       const float panel = servo.position_deg();
+      const double p_now = 130.0 + (o.power ? (servo.phase() == ServoSequencer::Phase::kRamp ? 1000.0 : 300.0) : 0.0);
+      use_acc_mj += p_now * 0.010;
+      if (t % 1000 == 0) {
+        use_reading_mw = static_cast<float>(use_acc_mj);   // mJ over 1 s = mean mW
+        use_acc_mj = 0;
+      }
       bool on = false;
       double lamp_deg = 0;
       lamp(t, &on, &lamp_deg);
@@ -80,9 +95,11 @@ struct Twin {
         in.sun_deg = e.sun_deg;
         in.panel_deg = panel;
         in.servo_busy = servo.busy();
+        if (stall.update(t, servo.busy(), move_deg, true, use_reading_mw)) ++stall_trips;
         const TrackerDecision d = tracker.step(in);
         if (d.move) {
-          servo.command(d.target_deg, t, nullptr);
+          const float from = servo.position_deg();
+          if (servo.command(d.target_deg, t, nullptr)) move_deg = fabsf(d.target_deg - from);
           ++moves_requested;
         }
         tel.set_angles(t, panel, d.sun_deg, d.sun_valid);
@@ -100,7 +117,7 @@ struct Twin {
         s.p_trk_valid = s.p_fix_valid = s.p_use_valid = s.vsup_valid = true;
         s.p_trk_mw = static_cast<float>(pt);
         s.p_fix_mw = static_cast<float>(pf);
-        s.p_use_mw = 130.0f + (o.power ? 600.0f : 0.0f);
+        s.p_use_mw = use_reading_mw;
         s.vsup_v = 5.02f;
         s.ang_panel_valid = snap.panel_valid;
         s.ang_panel_deg = snap.panel_deg;
@@ -163,6 +180,7 @@ TEST(closed_loop_twin_tracks_a_moving_lamp_then_stows_in_the_dark) {
   // 105 deg of travel inside the range at 5 deg per move -> about 21 moves.
   CHECK(w.moves_requested >= 15u && w.moves_requested <= 35u);
   CHECK(w.servo.powered_ms() < 60000u);   // the servo is powered well under a minute in 2 h
+  CHECK_EQ(w.stall_trips, 0u);            // free moves (incl. the 75 deg stow) never look like a stall
   CHECK(mov >= 15);                       // the minutes with a move show MOV
   CHECK(trk > 60);
   CHECK(idl >= 1);                        // dark, waiting to stow
@@ -193,27 +211,36 @@ TEST(closed_loop_twin_tracks_a_moving_lamp_then_stows_in_the_dark) {
 }
 
 TEST(closed_loop_twin_stall_guard_stops_a_jammed_servo) {
-  // The panel is jammed: during the move P_use sits at the stall level. The
-  // guard must trip within its window, and the servo be switched off.
-  ServoConfig sc;
-  sc.slew_deg_per_s = 5.0f;   // a long move (40 deg = 8 s) so the stall can show
-  ServoSequencer servo(sc, -20.0f);
-  StallGuard guard{StallConfig()};
-  servo.tick(0);
-  servo.command(20.0f, 0, nullptr);
-  bool tripped = false;
-  uint32_t trip_ms = 0;
-  for (uint32_t t = 0; t < 10000 && !tripped; t += 10) {
-    const ServoSequencer::Output o = servo.tick(t);
-    const float p_use = o.power ? 7000.0f : 130.0f;   // 1.4 A at 5 V while powered
-    if (t % 1000 == 0 && guard.update(t, servo.busy(), true, p_use)) {
-      servo.stop(t);
-      tripped = true;
-      trip_ms = t;
+  // Shipped settings (30 deg/s ramp, 1.5 J + 0.06 J/deg): the panel is jammed,
+  // so the servo draws its stall power (7 W) whenever it is powered. The
+  // consumption reading is the 1 s average, once a second (INA226). The guard
+  // must trip for small and large moves, and the servo be switched off.
+  for (float size : {5.0f, 20.0f, 45.0f, 90.0f}) {
+    ServoSequencer servo(ServoConfig(), -45.0f);
+    StallGuard guard{StallConfig()};
+    double acc = 0;
+    float reading = 130.0f;
+    servo.tick(0);
+    guard.update(0, false, 0.0f, true, reading);
+    servo.command(-45.0f + size, 100, nullptr);
+    bool tripped = false;
+    uint32_t trip_ms = 0;
+    for (uint32_t t = 100; t < 12000 && !tripped; t += 10) {
+      const ServoSequencer::Output o = servo.tick(t);
+      acc += (o.power ? 7000.0 : 130.0) * 0.010;
+      if (t % 1000 == 0) {
+        reading = static_cast<float>(acc);
+        acc = 0;
+      }
+      if (t % 200 == 0 && guard.update(t, servo.busy(), size, true, reading)) {
+        servo.stop(t);
+        tripped = true;
+        trip_ms = t;
+      }
     }
+    CHECK(tripped);
+    CHECK(trip_ms <= 6000u);
+    CHECK(!servo.powered());
+    CHECK(!servo.position_known());
   }
-  CHECK(tripped);
-  CHECK(trip_ms >= 2500u && trip_ms <= 4000u);
-  CHECK(!servo.powered());
-  CHECK(!servo.position_known());
 }

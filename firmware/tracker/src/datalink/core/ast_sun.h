@@ -1,21 +1,24 @@
 // Sun direction from the photodiode arc (Solar Sensing; owner CO, starter code
 // by AM). Portable maths only: the ADC reads are in tracker/sensing.cpp.
 //
-// Each photodiode faces a known direction on the tracking axis (east
+// Each photodiode faces a known direction phi_i on the tracking axis (east
 // negative). Its signal is modelled as
-//     s_i = A * cos(theta - phi_i) + B        (B = diffuse/ambient light)
-// for the sensors that face the light (|theta - phi_i| < 85 deg). Writing
-// a = A cos(theta), b = A sin(theta) makes this linear in (a, b, B), so three
-// or more sensors give theta = atan2(b, a) by least squares. Sensors that
-// face away from the light are dropped and the fit repeated.
+//     s_i = A * r(theta - phi_i) + B,   r(x) = cos(x)^k for |x| < 90 deg, else 0
+// (B = diffuse/ambient light, k = response_power, 1 for a bare photodiode).
+// For every candidate direction theta the model is linear in A and B, so the
+// estimate is the theta (1 deg grid, then 0.05 deg) with the smallest
+// least-squares misfit. Sensors facing away read B only, which the model
+// covers, so none has to be dropped.
 //
 // Accuracy (unit tests, 4 sensors 30 deg apart, cosine response): exact with
-// matched sensors; mean 0.6 deg, worst 4 deg with 1 % gain mismatch; worst
-// about 14 deg near the ends of the arc with 3 % mismatch. So match the
-// channels first (`sun cal flat` under a diffuser, see tracker/README.md), and
-// expect real photodiodes to differ from a cosine: check against the
-// inclinometer. Mounting the arc ON the panel (it then only has to find
-// zero, where it is most accurate) avoids most of this.
+// matched sensors; mean under 1 deg, worst under 5 deg with 1 % gain mismatch
+// and 5 mV noise; worst about 14 deg near the ends of the arc with 3 %
+// mismatch. So match the channels first (`sun cal flat` under a diffuser, see
+// tracker/README.md), and check the real angular response against the
+// inclinometer: a narrower response than a cosine (a shroud, a lens) shows up
+// as "readings do not fit" until response_power is raised (try 2). Mounting
+// the arc ON the panel (it then only has to find zero, where it is most
+// accurate) avoids most of this.
 #pragma once
 #include <stdint.h>
 
@@ -38,7 +41,17 @@ struct SunArcConfig {
   float dark_total_mv = 40.0f;   // sum of corrected signals below this = dark (night, lamp off)
   float saturated_mv = 3000.0f;  // raw reading at or above this is clipped by the ADC
   float max_abs_deg = 70.0f;     // an estimate further out than this is not trusted
-  float face_limit_deg = 85.0f;  // sensors further than this from the estimate are dropped
+  float response_power = 1.0f;   // k in cos^k: 1 = bare photodiode; raise if the response is narrower
+  // A direction is only reported when the light has one: a beam weaker than
+  // min_amplitude_mv, or weak against the ambient level (contrast), is diffuse
+  // light (overcast, room light) and gives no direction - otherwise noise
+  // would send the panel back and forth. A fit that leaves a large misfit
+  // means the readings do not look like one light source (a dead or stuck
+  // photodiode, a shadow on one sensor): also no direction, and the control
+  // code raises fault 5 if it lasts.
+  float min_amplitude_mv = 30.0f;
+  float min_contrast = 0.15f;      // amplitude / (amplitude + ambient)
+  float max_misfit = 0.30f;        // rms misfit / amplitude
   SunMethod method = SunMethod::kCosineFit;
 };
 
@@ -51,6 +64,9 @@ struct SunEstimate {
   float amplitude_mv = 0.0f;  // fitted A (cosine fit)
   float ambient_mv = 0.0f;    // fitted B (cosine fit)
   float residual_mv = 0.0f;   // rms misfit of the sensors used
+  float contrast = 0.0f;      // amplitude / (amplitude + ambient), 0..1
+  bool diffuse = false;       // light without a clear direction (cloud, room light)
+  bool poor_fit = false;      // readings do not fit one light direction (sensor fault?)
   uint8_t used = 0;           // sensors in the final fit
   const char* why = "";       // why it is not valid ("" when valid)
 };

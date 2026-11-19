@@ -72,8 +72,8 @@ enum class InaChip : uint8_t { kNone = 0, kIna226 = 1, kIna219 = 2 };
 const char* ina_chip_name(InaChip c);
 // Decides which chip answered, from what the I2C reads returned:
 //   mfg_ok/mfg_id     register 0xFE (INA226: 0x5449 "TI")
-//   die_ok/die_id     register 0xFF (INA226: 0x2260; INA3221, which also says
-//                     "TI", is 0x3220 and is refused)
+//   die_ok/die_id     register 0xFF (INA226: 0x226x; any other TI die, such
+//                     as the INA3221 0x3220 or INA260 0x2270, is refused)
 //   cfg_ok/cfg_reset  register 0x00 read just after writing the reset bit
 //                     (INA219 power-on value 0x399F)
 // Only addresses 0x40-0x4F are ever probed, so no other kind of chip is reset.

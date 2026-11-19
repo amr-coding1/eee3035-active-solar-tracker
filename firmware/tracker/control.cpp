@@ -20,7 +20,7 @@ const char* const kHelp =
     "Control and servo:\n"
     "  servo <deg>              manual: move to that panel angle and hold (0 level, east -)\n"
     "  servo test               manual steps -45..+45 deg, 8 s each (inclinometer check)\n"
-    "  servo auto               back to tracking\n"
+    "  servo auto               start tracking (the servo is held off after boot)\n"
     "  servo off                switch the servo off now and hold\n"
     "  live on|off              one line a second: sun, panel, powers, state\n"
     "  ctrl | ctrl reset        control status | clear a latched servo fault\n";
@@ -36,15 +36,19 @@ ast::StallGuard* g_stall = nullptr;
 uint8_t g_latched_fault = 0;       // 8: servo stall or clutch slip, until `ctrl reset`
 const char* g_latched_why = "";
 uint8_t g_short_fault = 0;         // 7: reported for kFaultShowMs
-uint32_t g_short_until = 0;
+uint32_t g_short_since = 0;
 uint32_t g_saturated_since = 0;
 bool g_saturated = false;
+uint32_t g_misfit_since = 0;
+bool g_misfit = false;
+float g_move_deg = 0.0f;           // size of the move in progress (stall allowance)
 
 bool g_live = false;
 uint32_t g_last_live = 0;
 bool g_test = false;
 int g_test_idx = 0;
-uint32_t g_test_next = 0;
+bool g_test_step_now = false;      // take the next test step as soon as the servo is idle
+uint32_t g_test_step_ms = 0;
 
 // Last values, for `ctrl` and `live`.
 sensing::Sun g_sun;
@@ -84,6 +88,10 @@ void latch_fault(uint8_t code, const char* why) {
 }
 
 void manual_move(float deg) {
+  if (g_latched_fault != 0) {
+    Serial.printf("servo: fault %u is latched (%s); fix it, then `ctrl reset` - no move\n", static_cast<unsigned>(g_latched_fault), g_latched_why);
+    return;
+  }
   g_tracker->set_manual(deg);
   transmission::log("servo: manual, to %.1f deg", static_cast<double>(deg));
 }
@@ -112,6 +120,8 @@ void print_status() {
   Serial.printf("settings  deadband %.1f, range +/-%.0f, stow %.0f, dark->stow %lu s, gap %lu s\n", static_cast<double>(cfg::kDeadbandDeg),
                 static_cast<double>(cfg::kTrackLimitDeg), static_cast<double>(cfg::kStowDeg), static_cast<unsigned long>(cfg::kDarkToStowMs / 1000u),
                 static_cast<unsigned long>(cfg::kMinMoveGapMs / 1000u));
+  Serial.printf("stall     last move window %.2f J above the pre-move level (allowed %.2f J)\n", static_cast<double>(g_stall->excess_j()),
+                static_cast<double>(g_stall->allowance_j()));
 }
 
 void print_live() {
@@ -165,9 +175,13 @@ bool handle(const char* line) {
     g_tracker->hold();   // do not move again until told
     Serial.printf("servo: switched off, manual hold (`servo auto` to track again)\n");
   } else if (strcmp(w1, "test") == 0) {
+    if (g_latched_fault != 0) {
+      Serial.printf("servo test: fault %u is latched (%s); `ctrl reset` first\n", static_cast<unsigned>(g_latched_fault), g_latched_why);
+      return true;
+    }
     g_test = true;
     g_test_idx = 0;
-    g_test_next = 0;
+    g_test_step_now = true;
     Serial.printf("servo test: %d steps of %lu s; read the inclinometer at each and note commanded vs measured\n", kTestCount,
                   static_cast<unsigned long>(kTestHoldMs / 1000u));
   } else {
@@ -188,10 +202,14 @@ bool handle(const char* line) {
 void begin() {
   g_tracker = new ast::Tracker(make_tracker_config());
   ast::StallConfig sc;
-  sc.limit_mw = cfg::kStallLimitMw;
-  sc.max_ms = cfg::kStallMs;
+  sc.base_j = cfg::kStallBaseJ;
+  sc.j_per_deg = cfg::kStallJPerDeg;
   g_stall = new ast::StallGuard(sc);
   transmission::add_commands(handle, kHelp);
+  if (!cfg::kStartTracking) {
+    g_tracker->hold();   // nothing moves until someone types `servo auto` or `servo <deg>`
+    transmission::log("control: servo held OFF after boot - `servo <deg>` to move by hand, `servo auto` to start tracking");
+  }
 }
 
 void step() {
@@ -206,34 +224,35 @@ void step() {
 
   // 2. Faults
   const transmission::Power pw = transmission::power();
-  if (g_stall->update(now, servo::moving(), pw.use_ok, pw.use_mw)) {
+  if (g_stall->update(now, servo::moving(), g_move_deg, pw.use_ok, pw.use_mw)) {
     servo::stop();
-    latch_fault(8, "servo stalled or overloaded (P_use stayed high during a move)");
+    latch_fault(8, "servo stalled or overloaded (too much energy drawn for the move)");
   }
   if (g_panel_measured && !servo::moving() && servo::position_known() && fabsf(measured - servo::angle()) > cfg::kPotSlipDeg) {
     latch_fault(8, "panel angle differs from the command (clutch slip or jam)");
   }
-  if (g_sun.saturated && !g_sun.valid) {
-    if (!g_saturated) {
-      g_saturated = true;
-      g_saturated_since = now;
-    }
-  } else {
-    g_saturated = false;
-  }
-  const bool fault5 = g_saturated && now - g_saturated_since >= kSaturatedFaultMs;
-  if (g_short_fault != 0 && static_cast<int32_t>(now - g_short_until) >= 0) g_short_fault = 0;
+  // Fault 5: the arc gives nonsense for a while although it is lit -
+  // saturated channels (10 s) or readings that fit no light direction (30 s).
+  const bool saturated_now = g_sun.saturated && !g_sun.valid;
+  if (saturated_now && !g_saturated) g_saturated_since = now;
+  g_saturated = saturated_now;
+  const bool misfit_now = g_sun.poor_fit;
+  if (misfit_now && !g_misfit) g_misfit_since = now;
+  g_misfit = misfit_now;
+  const bool fault5 = (g_saturated && now - g_saturated_since >= kSaturatedFaultMs) || (g_misfit && now - g_misfit_since >= cfg::kSunFaultMs);
+  if (g_short_fault != 0 && now - g_short_since >= cfg::kFaultShowMs) g_short_fault = 0;
   g_fault_now = g_latched_fault != 0 ? g_latched_fault : (g_short_fault != 0 ? g_short_fault : (fault5 ? 5 : 0));
 
-  // 3. Servo test sequence (manual steps)
-  if (g_test && !servo::moving() && static_cast<int32_t>(now - g_test_next) >= 0) {
+  // 3. Servo test sequence (manual steps, kTestHoldMs at each)
+  if (g_test && !servo::moving() && (g_test_step_now || now - g_test_step_ms >= kTestHoldMs)) {
+    g_test_step_now = false;
     if (g_test_idx >= kTestCount) {
       g_test = false;
       Serial.printf("servo test done: manual hold at 0 deg (`servo auto` to track again)\n");
     } else {
       manual_move(kTestAngles[g_test_idx]);
       ++g_test_idx;
-      g_test_next = now + kTestHoldMs;
+      g_test_step_ms = now;
     }
   }
 
@@ -249,10 +268,11 @@ void step() {
   g_dec = g_tracker->step(in);
   if (g_dec.move) {
     bool clamped = false;
-    servo::move_to(g_dec.target_deg, &clamped);
+    const float from = servo::angle();
+    if (servo::move_to(g_dec.target_deg, &clamped)) g_move_deg = fabsf(servo::target() - from);
     if (clamped) {
       g_short_fault = 7;
-      g_short_until = now + cfg::kFaultShowMs;
+      g_short_since = now;
       transmission::log("servo: %.1f deg is outside +/-%.0f deg, clamped (fault 7)", static_cast<double>(g_dec.target_deg),
                         static_cast<double>(cfg::kServoLimitDeg));
     }

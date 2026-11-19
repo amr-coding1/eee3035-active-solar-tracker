@@ -26,6 +26,8 @@ struct TrackerConfig {
   uint32_t dark_to_stow_ms = 600000;  // 10 min outdoors; set much shorter for lamp tests
   uint32_t min_move_gap_ms = 10000;   // never re-point more often than this
   float filter_alpha = 0.3f;          // weight of a new sun estimate (1 = no smoothing)
+  uint32_t lost_reset_ms = 2000;      // the smoothing restarts only after this long without an estimate
+  float at_stow_deg = 2.0f;           // within this of the stow angle counts as stowed (pot noise)
 };
 
 struct TrackerInput {
@@ -72,33 +74,48 @@ class Tracker {
   float manual_deg_ = 0.0f;
   bool have_filter_ = false;
   float filtered_ = 0.0f;
+  uint32_t last_valid_ms_ = 0;
   bool dark_ = false;
   uint32_t dark_since_ms_ = 0;
   bool moved_once_ = false;
   uint32_t last_move_ms_ = 0;
 };
 
-// Servo stall/overload guard: while the servo is moving, the tracker's own
-// power (P_use, from the consumption sensor, 1 Hz) must not stay above a
-// threshold for longer than a few seconds. A jammed panel or a slipping clutch
-// shows up as a long high-current period. Thresholds are bench values.
+// Servo stall/overload guard. A jammed panel or a slipping clutch makes the
+// servo draw its stall current (about 1.4 A at 5 V, 7 W) for the whole move,
+// where a free move takes a few tenths of a joule. P_use comes from the
+// consumption sensor only once a second (an INA226 averages over that second;
+// an INA219 is a 68 ms snapshot), and a 5 deg move lasts under a second, so the
+// guard adds up the energy above the level measured just before the move,
+// over the move and a tail after it (so the 1 Hz reading that covers the move
+// is counted), and compares it with an allowance that grows with the move:
+//   allowance = base_j + j_per_deg * |move|
+// Example with the defaults: a jammed 5 deg move costs about 5 J against
+// 1.8 J allowed (stall); a free 90 deg stow move about 2-5 J against 6.9 J.
 struct StallConfig {
-  float limit_mw = 4000.0f;   // DS-R001 stall is ~1.4 A at 5 V (7 W); moving ~0.3-1.5 W
-  uint32_t max_ms = 2500;     // longer than this above the limit = stall
+  float base_j = 1.5f;
+  float j_per_deg = 0.06f;
+  uint32_t tail_ms = 1500;
 };
 
 class StallGuard {
  public:
   explicit StallGuard(const StallConfig& cfg) : cfg_(cfg) {}
   void set_config(const StallConfig& cfg) { cfg_ = cfg; }
-  // Returns true once the limit has been exceeded for max_ms while busy.
-  bool update(uint32_t now_ms, bool servo_busy, bool p_use_valid, float p_use_mw);
-  void reset() { above_ = false; }
+  // Call every control step. move_deg: size of the move in progress (the
+  // angle it set out to cover). Returns true once the excess energy of the
+  // current move window passes its allowance (once per window).
+  bool update(uint32_t now_ms, bool servo_busy, float move_deg, bool p_use_valid, float p_use_mw);
+  void reset() { active_ = false; }
+  float excess_j() const { return excess_j_; }      // of the current or last window
+  float allowance_j() const { return allow_j_; }
 
  private:
   StallConfig cfg_;
-  bool above_ = false;
-  uint32_t since_ms_ = 0;
+  bool active_ = false;
+  bool baseline_set_ = false;
+  float baseline_mw_ = 0, excess_j_ = 0, allow_j_ = 0;
+  uint32_t last_ms_ = 0, tail_until_ms_ = 0;
 };
 
 }  // namespace ast

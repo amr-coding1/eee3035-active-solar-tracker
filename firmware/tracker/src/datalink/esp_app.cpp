@@ -192,12 +192,22 @@ bool g_ntp_window_started = false;
 
 void ntp_callback(struct timeval*) { g_ntp_flag.store(true); }
 
+// The second consumption branch shares the `use` shunt and gains but not the
+// offsets: an offset applied to both branches would count twice in the sum.
+ast::InaChannelCal use2_cal(ast::InaChannelCal c) {
+  c.volts.offset = 0.0f;
+  c.milliamps.offset = 0.0f;
+  return c;
+}
+
 // ---- sensors -----------------------------------------------------------------------
 void read_sensors(ast::Sample1Hz* s) {
   ast::InaReading r[3];
   bool ok[3];
   ast::InaChip chip[3];
   uint8_t addr[3];
+  ast::InaReading r2;
+  bool ok2 = false;
   {
     std::lock_guard<std::mutex> g(g_i2c_mu);
     for (int i = 0; i < 3; ++i) {
@@ -205,12 +215,25 @@ void read_sensors(ast::Sample1Hz* s) {
       chip[i] = g_ina[i].chip();
       addr[i] = g_ina[i].address();
     }
+    if (g_use2) ok2 = g_ina_use2.read(&r2);
+  }
+  // Two supply branches (e.g. MCU and servo fed separately from the power
+  // bank, each through its own sensor): P_use is their sum, and unknown if
+  // either branch did not answer. The voltage stays that of the first branch.
+  ast::InaReading use = r[2];
+  bool use_ok = ok[2];
+  if (g_use2) {
+    use_ok = ok[2] && ok2;
+    use.power_mw = r[2].power_mw + r2.power_mw;
+    use.milliamps = r[2].milliamps + r2.milliamps;
+    use.raw_milliamps = r[2].raw_milliamps + r2.raw_milliamps;
   }
   {
+    // Published together, so other tasks never see half of an update.
     std::lock_guard<std::mutex> g(g_cfg_mu);
     for (int i = 0; i < 3; ++i) {
-      g_last_valid[i] = ok[i];
-      if (ok[i]) g_last_reading[i] = r[i];
+      g_last_valid[i] = i == 2 ? use_ok : ok[i];
+      if (i == 2 ? use_ok : ok[i]) g_last_reading[i] = i == 2 ? use : r[i];
       g_last_chip[i] = chip[i];
       g_last_addr[i] = addr[i];
     }
@@ -219,27 +242,8 @@ void read_sensors(ast::Sample1Hz* s) {
   s->p_trk_mw = r[0].power_mw;
   s->p_fix_valid = ok[1];
   s->p_fix_mw = r[1].power_mw;
-  s->p_use_valid = ok[2];
-  s->p_use_mw = r[2].power_mw;
-  if (g_use2) {
-    // Two supply branches (e.g. MCU and servo fed separately from the power
-    // bank, each through its own channel of a four-channel INA219 board):
-    // P_use is their sum, and unknown if either branch did not answer.
-    ast::InaReading r2;
-    bool ok2;
-    {
-      std::lock_guard<std::mutex> g(g_i2c_mu);
-      ok2 = g_ina_use2.read(&r2);
-    }
-    s->p_use_valid = ok[2] && ok2;
-    s->p_use_mw = r[2].power_mw + (ok2 ? r2.power_mw : 0.0f);
-    std::lock_guard<std::mutex> g(g_cfg_mu);
-    g_last_valid[2] = s->p_use_valid;
-    if (s->p_use_valid) {
-      g_last_reading[2].power_mw = s->p_use_mw;
-      g_last_reading[2].milliamps += r2.milliamps;   // both branches; volts stay those of the first
-    }
-  }
+  s->p_use_valid = use_ok;
+  s->p_use_mw = use.power_mw;
   // The consumption sensor sits in the 5 V feed to the tracker (19 Nov wiring
   // correction): its bus voltage is the supply rail, field7 V_supply.
   s->vsup_valid = ok[2];
@@ -576,7 +580,7 @@ void cmd_cal_show() {
 void apply_cal(int ch) {   // g_cfg_mu held by the caller
   std::lock_guard<std::mutex> g(g_i2c_mu);
   g_ina[ch].set_cal(g_settings.cal[ch]);
-  if (ch == 2 && g_use2) g_ina_use2.set_cal(g_settings.cal[2]);
+  if (ch == 2 && g_use2) g_ina_use2.set_cal(use2_cal(g_settings.cal[2]));
 }
 
 void cmd_cal_point(const ast::Command& c) {
@@ -900,7 +904,7 @@ void app_setup(const Defaults& d) {
                   g_ina[i].ok() ? ast::ina_chip_name(g_ina[i].chip()) : "NOT FOUND (fault 1/2/3 until it answers)");
   }
   if (g_use2) {
-    g_ina_use2.set_cal(g_settings.cal[2]);   // shares the `use` calibration
+    g_ina_use2.set_cal(use2_cal(g_settings.cal[2]));   // shares the `use` gains
     ast::InaReading r;
     {
       std::lock_guard<std::mutex> g(g_i2c_mu);

@@ -42,6 +42,8 @@ TEST(ina_identify_tells_the_chips_apart) {
   CHECK(ina_identify(true, 0x5449, true, 0x2260, false, 0) == InaChip::kIna226);
   CHECK(ina_identify(true, 0x5449, false, 0, false, 0) == InaChip::kIna226);   // die id unreadable: still an INA226
   CHECK(ina_identify(true, 0x5449, true, 0x3220, true, 0x7127) == InaChip::kNone);   // INA3221: refused
+  CHECK(ina_identify(true, 0x5449, true, 0x2270, false, 0) == InaChip::kNone);        // INA260: refused
+  CHECK(ina_identify(true, 0x5449, true, 0x2261, false, 0) == InaChip::kIna226);      // INA226, another die revision
   CHECK(ina_identify(false, 0, false, 0, true, 0x399F) == InaChip::kIna219);
   CHECK(ina_identify(true, 0x0000, true, 0x0000, true, 0x399F) == InaChip::kIna219);  // INA219 answers 0xFE with junk
   CHECK(ina_identify(true, 0x1234, true, 0, true, 0x1234) == InaChip::kNone);      // something else at that address
@@ -176,6 +178,80 @@ TEST(sun_centroid_method_and_angle_diff) {
   CHECK_NEAR(angle_diff_deg(10.0f, 370.0f), 0.0, 1e-4);
 }
 
+TEST(sun_diffuse_light_gives_no_direction) {
+  // Overcast or room light: every channel about the same. Noise must not be
+  // read as a direction (the panel would hunt back and forth).
+  SunArcConfig cfg;
+  float mv[4];
+  unsigned seed = 99;
+  auto rnd = [&]() {
+    seed = seed * 1103515245u + 12345u;
+    return static_cast<double>((seed >> 8) & 0xFFFF) / 32767.5 - 1.0;
+  };
+  int valid = 0;
+  for (int k = 0; k < 500; ++k) {
+    for (float& v : mv) v = static_cast<float>(500.0 + 3.0 * rnd());
+    const SunEstimate e = estimate_sun(mv, cfg);
+    if (e.valid) ++valid;
+    CHECK(e.valid || e.diffuse);
+  }
+  CHECK_EQ(valid, 0);
+  // A weak beam on a bright background: contrast 0.08 is diffuse, 0.2 is a direction.
+  synth(cfg, 20.0, 50.0, 600.0, mv);
+  CHECK(estimate_sun(mv, cfg).diffuse);
+  synth(cfg, 20.0, 150.0, 600.0, mv);
+  SunEstimate e = estimate_sun(mv, cfg);
+  CHECK(e.valid);
+  CHECK_NEAR(e.sun_deg, 20.0, 0.1);
+  CHECK_NEAR(e.contrast, 0.2, 0.01);
+}
+
+TEST(sun_dead_photodiode_is_flagged_not_trusted) {
+  SunArcConfig cfg;
+  float mv[4];
+  // Outer east channel dead (reads 0): the light at -40 deg would otherwise
+  // be reported near 0 deg.
+  for (int t = -40; t <= 20; t += 10) {
+    synth(cfg, t, 1500.0, 80.0, mv);
+    mv[0] = 0.0f;
+    const SunEstimate e = estimate_sun(mv, cfg);
+    CHECK(!e.valid);
+    CHECK(e.poor_fit);
+  }
+  // Inner channel dead: never a valid direction.
+  for (int t = -40; t <= 40; t += 20) {
+    synth(cfg, t, 1500.0, 80.0, mv);
+    mv[1] = 0.0f;
+    CHECK(!estimate_sun(mv, cfg).valid);
+  }
+}
+
+TEST(sun_response_power_matches_narrower_photodiodes) {
+  // A shroud or lens makes the response narrower than a cosine. With the
+  // right k the fit is exact again; with the wrong one it says so.
+  SunArcConfig cfg;
+  float mv[4];
+  auto narrow = [&](double t) {
+    for (int i = 0; i < 4; ++i) {
+      const double c = cos((t - static_cast<double>(cfg.sensor_deg[i])) * 3.14159265358979 / 180.0);
+      mv[i] = static_cast<float>(1500.0 * (c > 0 ? c * c : 0.0) + 60.0);
+    }
+  };
+  int flagged = 0;
+  for (int t = -60; t <= 60; t += 5) {
+    narrow(t);
+    if (!estimate_sun(mv, cfg).valid) ++flagged;   // cos^1 model on cos^2 data
+  }
+  CHECK(flagged > 5);
+  cfg.response_power = 2.0f;
+  for (int t = -60; t <= 60; t += 5) {
+    narrow(t);
+    const SunEstimate e = estimate_sun(mv, cfg);
+    CHECK(e.valid);
+    CHECK_NEAR(e.sun_deg, t, 0.05);
+  }
+}
+
 // ---- servo ----------------------------------------------------------------------
 
 TEST(servo_pulse_mapping_limits_and_duty) {
@@ -197,6 +273,14 @@ TEST(servo_pulse_mapping_limits_and_duty) {
   cfg.west_is_higher_pulse = true;
   cfg.trim_deg = 2.0f;                // inclinometer showed the panel 2 deg short
   CHECK_EQ(servo_pulse_us(0.0f, cfg), 1522);
+  // The trim can never push the command past the limit (50 deg = 2056 us)...
+  cfg.trim_deg = 5.0f;
+  CHECK_EQ(servo_pulse_us(50.0f, cfg), 2056);
+  CHECK_EQ(servo_pulse_us(-50.0f, cfg), 1000);   // -50 + 5 = -45
+  // ... and a wild trim is limited to +/-10 deg.
+  cfg.trim_deg = 40.0f;
+  CHECK_EQ(servo_pulse_us(0.0f, cfg), 1611);     // 0 + 10 deg
+  cfg.trim_deg = 0.0f;
   // 50 Hz, 14-bit LEDC: 500 us -> 410, 1500 us -> 1229, 2500 us -> 2048.
   CHECK_EQ(servo_duty(500, 20000, 14), 410u);
   CHECK_EQ(servo_duty(1500, 20000, 14), 1229u);
@@ -234,10 +318,19 @@ TEST(servo_sequence_powers_up_ramps_settles_and_switches_off) {
   CHECK(s.phase() == ServoSequencer::Phase::kSettle);
   CHECK_EQ(o.pulse_us, servo_pulse_us(-30.0f, cfg));
   CHECK_NEAR(s.position_deg(), -30.0, 1e-4);
-  // Settle 400 ms, then everything off.
+  // Settle 400 ms; then the pulses stop while the supply stays on for 40 ms
+  // (the last pulse must finish before the signal pin is released); then off.
   t += 399;
   o = s.tick(t);
-  CHECK(o.power);
+  CHECK(o.power && o.pulses);
+  t += 2;
+  o = s.tick(t);
+  CHECK(o.power && !o.pulses);
+  CHECK(s.phase() == ServoSequencer::Phase::kStopping);
+  CHECK(s.busy());
+  t += 39;
+  o = s.tick(t);
+  CHECK(o.power && !o.pulses);
   t += 2;
   o = s.tick(t);
   CHECK(!o.power && !o.pulses);
@@ -246,8 +339,28 @@ TEST(servo_sequence_powers_up_ramps_settles_and_switches_off) {
   CHECK(s.position_known());
   // Same angle again: nothing to do.
   CHECK(!s.command(-30.0f, t, nullptr));
-  // Powered time is booked (power-up + ramp + settle, about 1.05 s).
-  CHECK(s.powered_ms() > 1000u && s.powered_ms() < 1200u);
+  // Powered time is booked (power-up + ramp + settle + stop, about 1.1 s).
+  CHECK(s.powered_ms() > 1000u && s.powered_ms() < 1250u);
+}
+
+TEST(servo_unknown_start_goes_straight_to_target_and_late_ticks_do_not_jump) {
+  ServoConfig cfg;
+  // After a reset mid-move the angle is unknown: power up straight at the
+  // target (one jump), not at a stale angle followed by a ramp (two).
+  ServoSequencer s(cfg, -45.0f, false);
+  CHECK(!s.position_known());
+  s.tick(0);
+  CHECK(s.command(10.0f, 0, nullptr));
+  ServoSequencer::Output o = s.tick(10);
+  CHECK(o.power && o.pulses);
+  CHECK_EQ(o.pulse_us, servo_pulse_us(10.0f, cfg));
+  // A blocked loop (2 s between calls) must not make the ramp jump 60 deg.
+  ServoSequencer r(cfg, 0.0f);
+  r.tick(0);
+  r.command(45.0f, 0, nullptr);
+  r.tick(200);    // power-up done
+  r.tick(2200);   // 2 s late
+  CHECK(r.position_deg() <= 1.6f);   // at most 50 ms of travel at 30 deg/s
 }
 
 TEST(servo_retarget_stop_and_no_switch_modes) {
@@ -361,11 +474,21 @@ TEST(tracker_dark_stows_after_delay_and_cloud_holds) {
   d = tr.step(tin(70000, true, false, -20.0f, -45.0f));
   CHECK(d.move);
   CHECK_NEAR(d.target_deg, -20.0, 1e-6);
-  // Light but no usable direction: hold.
+  // Light but no usable direction for a while (20 s since the last
+  // estimate): hold, and the smoothed value is dropped.
   d = tr.step(tin(90000, false, false, 0, -20.0f));
   CHECK(d.state == State::HLD);
   CHECK(!d.move);
   CHECK(!d.sun_valid);
+  // One noisy reading in between (200 ms gap): hold, but keep the smoothed
+  // value, so a flickering estimate cannot keep restarting the filter.
+  d = tr.step(tin(90200, true, false, -19.0f, -20.0f));
+  CHECK(d.state == State::TRK);
+  d = tr.step(tin(90400, false, false, 0, -20.0f));
+  CHECK(d.state == State::HLD);
+  CHECK(d.sun_valid);
+  CHECK_NEAR(d.sun_deg, -19.0, 1e-4);
+  CHECK(!d.move);
   // A short shadow does not stow: darkness has to last.
   d = tr.step(tin(91000, false, true, 0, -20.0f));
   d = tr.step(tin(100000, true, false, -19.0f, -20.0f));
@@ -410,20 +533,55 @@ TEST(tracker_filter_fault_and_manual_mode) {
   CHECK(d.state == State::HLD);
 }
 
-TEST(stall_guard_needs_sustained_high_power_while_moving) {
-  StallConfig cfg;   // 4000 mW for 2.5 s
-  StallGuard g(cfg);
-  CHECK(!g.update(0, true, true, 5000.0f));
-  CHECK(!g.update(2000, true, true, 5000.0f));
-  CHECK(g.update(2600, true, true, 5000.0f));
-  // A dip below the limit restarts the clock.
-  g.reset();
-  CHECK(!g.update(3000, true, true, 5000.0f));
-  CHECK(!g.update(4000, true, true, 1000.0f));
-  CHECK(!g.update(5000, true, true, 5000.0f));
-  CHECK(!g.update(7000, true, true, 5000.0f));
-  CHECK(g.update(7600, true, true, 5000.0f));
-  // Not moving, or no reading: never a stall.
-  CHECK(!g.update(9000, false, true, 9000.0f));
-  CHECK(!g.update(9000, true, false, 9000.0f));
+TEST(stall_guard_uses_the_energy_of_each_move) {
+  StallConfig cfg;   // 1.5 J + 0.06 J/deg, 1.5 s tail
+  // A jammed 5 deg move: 0.75 s at 7 W. The INA226 reports the 1 s average
+  // once a second, so the stall shows in the reading after the move.
+  {
+    StallGuard g(cfg);
+    CHECK(!g.update(0, false, 0.0f, true, 130.0f));      // level before the move
+    bool tripped = false;
+    float p = 130.0f;
+    for (uint32_t t = 200; t <= 3000 && !tripped; t += 200) {
+      if (t == 1000) p = 130.0f + 0.75f * 6870.0f;       // average over 0.25-1.0 s
+      if (t == 2000) p = 130.0f;
+      tripped = g.update(t, t >= 250 && t < 1000, 5.0f, true, p);
+    }
+    CHECK(tripped);
+    CHECK(g.excess_j() > g.allowance_j());
+    CHECK_NEAR(g.allowance_j(), 1.8, 1e-4);
+  }
+  // A free 5 deg move (about 1 W for 0.75 s): no trip.
+  {
+    StallGuard g(cfg);
+    g.update(0, false, 0.0f, true, 130.0f);
+    bool tripped = false;
+    float p = 130.0f;
+    for (uint32_t t = 200; t <= 4000; t += 200) {
+      if (t == 1000) p = 130.0f + 0.75f * 900.0f;
+      if (t == 2000) p = 130.0f;
+      tripped = tripped || g.update(t, t >= 250 && t < 1000, 5.0f, true, p);
+    }
+    CHECK(!tripped);
+    CHECK(g.excess_j() < 1.0f);
+  }
+  // A free 90 deg stow move: 3.6 s at about 1.2 W, allowance 6.9 J: no trip.
+  {
+    StallGuard g(cfg);
+    g.update(0, false, 0.0f, true, 130.0f);
+    bool tripped = false;
+    for (uint32_t t = 200; t <= 7000; t += 200) {
+      const bool busy = t >= 200 && t < 3800;
+      const float p = (t >= 1000 && t <= 4000) ? 1330.0f : 130.0f;
+      tripped = tripped || g.update(t, busy, 90.0f, true, p);
+    }
+    CHECK(!tripped);
+  }
+  // No reading at all: never a stall.
+  {
+    StallGuard g(cfg);
+    bool tripped = false;
+    for (uint32_t t = 0; t <= 4000; t += 200) tripped = tripped || g.update(t, t < 2000, 5.0f, false, 9000.0f);
+    CHECK(!tripped);
+  }
 }

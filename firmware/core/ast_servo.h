@@ -24,17 +24,19 @@ struct ServoConfig {
   float travel_deg = 180.0f;
   float servo_deg_at_level = 90.0f;   // servo angle when the panel is level
   bool west_is_higher_pulse = true;   // flip if the servo is mounted the other way round
-  float trim_deg = 0.0f;              // added to every command (found with the inclinometer)
-  float limit_deg = 50.0f;            // |panel| is never commanded beyond this (F3 end-stop margin)
+  float trim_deg = 0.0f;              // added to every command (found with the inclinometer), at most +/-10
+  float limit_deg = 50.0f;            // |panel| (with the trim) is never commanded beyond this (F3 end-stop margin)
   float slew_deg_per_s = 30.0f;       // ramp speed of the pulse
   uint32_t power_on_ms = 150;         // pulses at the old angle before the ramp starts
   uint32_t settle_ms = 400;           // pulses held at the target after the ramp
+  uint32_t stop_ms = 40;              // pulses stopped, supply still on (lets the last pulse finish)
   bool gate_power = true;             // false: no power switch fitted, servo always powered
   bool pulse_when_idle = false;       // only without a switch: keep pulsing between moves (holds, costs current)
 };
 
-// Pulse width (us) for a panel angle; the angle is clamped to +/-limit_deg
-// after the trim is added, and to the servo's own travel.
+// Pulse width (us) for a panel angle: the trim (at most +/-10 deg) is added,
+// then the sum is clamped to +/-limit_deg and to the servo's own travel, so a
+// wrong trim can never drive the panel past the limit.
 uint16_t servo_pulse_us(float panel_deg, const ServoConfig& cfg);
 // Clamps a requested panel angle to +/-limit_deg; *clamped is set when it was outside.
 float servo_clamp(float panel_deg, const ServoConfig& cfg, bool* clamped);
@@ -43,16 +45,18 @@ uint32_t servo_duty(uint16_t pulse_us, uint32_t period_us, uint8_t bits);
 
 class ServoSequencer {
  public:
-  enum class Phase : uint8_t { kOff, kPowerUp, kRamp, kSettle, kIdle };
+  enum class Phase : uint8_t { kOff, kPowerUp, kRamp, kSettle, kStopping, kIdle };
   struct Output {
     bool power = false;      // servo supply switch
     bool pulses = false;     // PWM running (false: signal pin held LOW)
     uint16_t pulse_us = 0;   // valid when pulses
   };
 
-  // start_deg: where the panel is believed to be at boot (unknown in truth:
-  // the first move may jump from wherever it really is).
-  ServoSequencer(const ServoConfig& cfg, float start_deg);
+  // start_deg: where the panel is believed to be at boot; start_known: the
+  // belief is trustworthy (the last move ended cleanly). When it is not, the
+  // first move powers up straight at its target: from an unknown position
+  // there is nothing to ramp from, and one jump is better than two.
+  ServoSequencer(const ServoConfig& cfg, float start_deg, bool start_known = true);
 
   void set_config(const ServoConfig& cfg);
   const ServoConfig& config() const { return cfg_; }
@@ -64,11 +68,14 @@ class ServoSequencer {
   // Emergency stop (stall, fault): power off at once, the move is abandoned
   // and the position is marked uncertain.
   void stop(uint32_t now_ms);
-  // Advances the sequence; call every few milliseconds (the ramp is computed
-  // from the elapsed time, so a late call only makes the steps coarser).
+  // Advances the sequence; call every few milliseconds. The ramp advances by
+  // at most 50 ms worth of travel per call, so a stalled loop() slows the
+  // move down instead of making it jump.
   Output tick(uint32_t now_ms);
 
-  bool busy() const { return phase_ == Phase::kPowerUp || phase_ == Phase::kRamp || phase_ == Phase::kSettle; }
+  bool busy() const {
+    return phase_ == Phase::kPowerUp || phase_ == Phase::kRamp || phase_ == Phase::kSettle || phase_ == Phase::kStopping;
+  }
   bool powered() const { return phase_ != Phase::kOff; }
   Phase phase() const { return phase_; }
   float position_deg() const { return pos_; }      // follows the ramp (where the pulse points now)

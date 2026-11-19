@@ -23,8 +23,8 @@ C++ and are unit-tested on a PC, including a closed-loop "digital twin" that
 moves a simulated lamp across the arc (`firmware/host/tests`). The `.cpp` files
 here only connect them to the pins.
 
-**Status, 19 Nov 2026: compiles with no warnings (esp32 core 3.3.12) and passes
-211 PC tests. It has not run on the real board yet.** Wednesday's bench session
+**Status, 19 Nov 2026: compiles with no warnings (Arduino IDE / arduino-cli on
+esp32 core 3.3.12 and 4.0.0, and PlatformIO) and passes 211 PC tests. It has not run on the real board yet.** Wednesday's bench session
 is the first hardware test: follow "First power-up" below.
 
 ## Build and flash
@@ -84,16 +84,19 @@ it is powered. Over a day that is 1.2-4.8 Wh, more than the whole December
 tracking gain (about 0.7 Wh/day). So the firmware only powers it for a move:
 
 ```
-               +5 V (after the consumption sensor)
-                 |
-                 +-------------+
-               100 k           | S
-                 |         P-MOSFET (AO3401 or IRLML6402)
-                 +-------------| G
-                 |             | D
-                1 k            +----------------> servo red (V+)
-                 |             |
-                 | D        470-1000 uF + 100 nF to GND, at the servo
+   +5 V (after the consumption sensor)
+     |
+     +---- 1000 uF + 100 nF to GND   <- bulk capacitor BEFORE the switch: stays charged
+     |
+     +-------------+
+   100 k           | S
+     |         P-MOSFET (AO3401 or IRLML6402)
+     +-------------| G
+     |   100 nF    | D
+     +---||--+     +---- 10-47 uF ----> servo red (V+)
+         (G-S)     |      to GND, at the servo
+               22 k
+                   | D
   D8 --1 k-- G  N-MOSFET (2N7002)
            |     | S
          100 k   |
@@ -103,16 +106,24 @@ tracking gain (about 0.7 Wh/day). So the firmware only powers it for a move:
   D9 --330 R--> servo orange (signal)        servo brown --> common GND
 ```
 
-D8 HIGH turns the N-FET on, which pulls the P-FET gate low: servo powered.
-The 100 kΩ pull-down keeps the servo off while the board boots. Before power
-goes off the firmware stops the pulses and holds D9 LOW, so the signal pin
-cannot feed the servo. Without the switch, set `kServoPowerPin = -1` (the
-servo then stays powered: fine for a bench test, not for the energy result).
+D8 HIGH turns the N-FET on, which pulls the P-FET gate low through 22 kΩ:
+servo powered. The 100 nF from gate to source with the 22 kΩ slows the switch
+(a few ms) so it does not hit the supply with a current spike; the big
+capacitor sits **before** the switch, so it is already charged and feeds the
+servo's start current instead of being charged through the switch (which would
+pull the Nano's 5 V down and can reset it). The 100 kΩ pull-down keeps the
+servo off while the board boots. Before power goes off the firmware stops the
+pulses, waits for the last one to finish (25 ms), then holds D9 LOW, so the
+signal pin cannot feed the servo. Without the switch, set `kServoPowerPin = -1`
+(the servo then stays powered: fine for a bench test, not for the energy
+result).
 
 ## First power-up (bench, Wednesday 25 Nov)
 
-Do these in order, with the serial monitor open. Note every result in the lab
-book (date, time, who).
+**After every boot the servo stays off** until someone types `servo <deg>` or
+`servo auto` (`kStartTracking = false` in `config.h`), so nothing moves before
+the direction, level and limits have been checked. Do these in order, with
+the serial monitor open. Note every result in the lab book (date, time, who).
 
 1. **Boot log.** It lists the I2C devices and which chip answers at each
    address. Fix `config.h` addresses if needed. `status`: time valid? (needs
@@ -123,13 +134,19 @@ book (date, time, who).
 3. **Photodiodes.** Lamp on, `sun`: four readings, the estimate and why. No
    channel should say SATURATED; if one does, use a smaller load resistor.
    Cover all four, `sun cal dark`; put paper over them under even light,
-   `sun cal flat`.
-4. **Servo, by hand.** `servo 0`: the panel should be level (inclinometer).
-   `servo test` steps through -45 ... +45 deg, 8 s each: write down commanded
-   vs inclinometer. Put the average offset in `kServoTrimDeg`; if the panel
-   turns the wrong way, flip `kServoWestIsHigherPulse`. Watch for a jump at
-   power-up and for the board resetting when the servo starts (if it resets:
-   bigger capacitor at the servo, shorter wires).
+   `sun cal flat`. Then move the lamp to a few known angles: `sun` also prints
+   how well a cos^1 and a cos^2 response fit; if cos^2 fits clearly better,
+   set `kSunResponsePower = 2`. "Diffuse light" means no clear beam (hold);
+   "readings do not fit" means a dead, shaded or mis-wired photodiode.
+4. **Servo, by hand.** Hold the panel clear of anything, then `servo 0`: the
+   panel should be level (inclinometer). The very first move after flashing
+   goes straight to its target at full speed (the old angle is unknown); later
+   boots start from the angle saved after the last clean move. `servo test`
+   steps through -45 ... +45 deg, 8 s each: write down commanded vs
+   inclinometer. Put the average offset in `kServoTrimDeg`; if the panel turns
+   the wrong way, flip `kServoWestIsHigherPulse`. If the board resets when the
+   servo starts: capacitor before the switch, slower gate (see the switch
+   above), shorter wires, slower `kServoSlewDegPerS`.
 5. **Holding test (M9).** `servo off`, then push the panel edge gently
    (about 10 N). Does it hold unpowered? If not, the power switch saves energy
    but lets the panel drift: tell the group (design decision).
@@ -155,7 +172,7 @@ Tracker:
 | `pot` | panel-angle pot reading (if fitted) |
 | `servo <deg>` | manual: move to that panel angle and hold |
 | `servo test` | manual steps -45 ... +45 deg, 8 s each |
-| `servo auto` | back to tracking |
+| `servo auto` | start (or go back to) tracking |
 | `servo off` | switch the servo off now and hold |
 | `live on` / `live off` | one line a second: sun, panel, powers, state |
 | `ctrl` / `ctrl reset` | control status / clear a latched servo fault |
@@ -171,15 +188,17 @@ Tracker:
 | `kMinMoveGapMs` | 10 000 | stops hunting when the light flickers |
 | `kServoTrimDeg` | 0 | from the inclinometer check |
 | `kServoSlewDegPerS` | 30 | slower = smaller current spikes on the power bank |
-| `kStallLimitMw`, `kStallMs` | 4000, 2500 | servo stall protection (fault 8) |
+| `kStartTracking` | false | servo stays off after boot until `servo auto`; true for unattended runs |
+| `kSunResponsePower` | 1 | 2 if the photodiodes' response is narrower than a cosine (see `sun`) |
+| `kStallBaseJ`, `kStallJPerDeg` | 1.5, 0.06 | servo stall protection (fault 8): energy allowed per move |
 
 ## Faults the control code reports
 
 | Code | Meaning | What happens |
 |---|---|---|
-| 5 | sun-sensor arc fault: two or more channels saturated for 10 s | tracking holds |
+| 5 | sun-sensor arc fault: two or more channels saturated for 10 s, or readings that fit no light direction for 30 s | tracking holds |
 | 7 | travel limit: a command outside +/-50 deg was clamped | shown for the minute |
-| 8 | servo stall, overload or clutch slip (P_use high during a move, or the pot disagrees) | servo switched off, tracking stops until `ctrl reset` |
+| 8 | servo stall, overload or clutch slip: more energy drawn during a move than it allows (P_use), or the pot disagrees | servo switched off, tracking stops until `ctrl reset` |
 
 The data link adds its own: 1/2/3 power sensor missing, 4 clock, 6 buffer
 overflow, 9 uploads failing (docs/CONTRACT.md section 4).
@@ -194,7 +213,11 @@ overflow, 9 uploads failing (docs/CONTRACT.md section 4).
   inclinometer and adjust `kSunSensorDeg` or the method (core/ast_sun.h).
 - The panel angle is the commanded angle unless the pot is fitted, so a
   slipping clutch is only caught with the pot (or the inclinometer).
-- The first power-up after flashing may jump to the stowed angle; afterwards
-  the last angle is kept in flash.
+- The first move after flashing, or after a reset in the middle of a move,
+  goes straight to its target at full speed; afterwards the angle of the last
+  clean move is kept in flash and moves ramp at 30 deg/s.
+- The stall check uses the 1 Hz P_use reading: with an INA219 (68 ms
+  snapshots) a short jam can be missed; with an INA226 (1 s averages) it is
+  caught.
 - Many power banks switch off below about 50-100 mA. Check yours with the
   servo idle (bench item M13).

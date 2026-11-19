@@ -85,11 +85,22 @@ void cmd_sun() {
                   static_cast<double>(c > 0 ? c : 0), mv[i] >= g_arc.saturated_mv ? "  SATURATED" : "");
   }
   if (e.valid) {
-    Serial.printf("estimate %.1f deg (%u sensors, amplitude %.0f mV, ambient %.0f mV, misfit %.0f mV)%s\n",
+    Serial.printf("estimate %.1f deg (%u sensors, beam %.0f mV, ambient %.0f mV, contrast %.2f, misfit %.0f mV)%s\n",
                   static_cast<double>(e.sun_deg), static_cast<unsigned>(e.used), static_cast<double>(e.amplitude_mv),
-                  static_cast<double>(e.ambient_mv), static_cast<double>(e.residual_mv), e.saturated ? ", one channel clipped" : "");
+                  static_cast<double>(e.ambient_mv), static_cast<double>(e.contrast), static_cast<double>(e.residual_mv),
+                  e.saturated ? ", one channel clipped" : "");
   } else {
-    Serial.printf("no estimate: %s (total %.0f mV)\n", e.why, static_cast<double>(e.total_mv));
+    Serial.printf("no estimate: %s (total %.0f mV, beam %.0f mV, ambient %.0f mV, misfit %.0f mV)\n", e.why, static_cast<double>(e.total_mv),
+                  static_cast<double>(e.amplitude_mv), static_cast<double>(e.ambient_mv), static_cast<double>(e.residual_mv));
+  }
+  // Which response shape fits these readings better? (Set kSunResponsePower.)
+  ast::SunArcConfig alt = g_arc;
+  const float powers[2] = {1.0f, 2.0f};
+  for (float k : powers) {
+    alt.response_power = k;
+    const ast::SunEstimate a = ast::estimate_sun(mv, alt);
+    Serial.printf("  with response cos^%.0f: %s %.1f deg, misfit %.0f mV%s\n", static_cast<double>(k), a.valid ? "estimate" : "no estimate,",
+                  static_cast<double>(a.sun_deg), static_cast<double>(a.residual_mv), k == g_arc.response_power ? "  (in use)" : "");
   }
   print_cal();
 }
@@ -196,6 +207,9 @@ void begin() {
   g_arc.dark_total_mv = cfg::kSunDarkMv;
   g_arc.saturated_mv = cfg::kSunSaturatedMv;
   g_arc.max_abs_deg = cfg::kSunMaxAbsDeg;
+  g_arc.response_power = cfg::kSunResponsePower;
+  g_arc.min_contrast = cfg::kSunMinContrast;
+  g_arc.max_misfit = cfg::kSunMaxMisfit;
   load_cal();
   transmission::add_commands(handle, kHelp);
 }
@@ -207,6 +221,8 @@ Sun read_sun() {
   s.valid = e.valid;
   s.dark = e.dark;
   s.saturated = e.saturated;
+  s.diffuse = e.diffuse;
+  s.poor_fit = e.poor_fit;
   s.sun_deg = e.sun_deg;
   s.total_mv = e.total_mv;
   s.why = e.why;

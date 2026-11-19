@@ -3,6 +3,9 @@
 // The decisions themselves (deadband, limits, stow, hold, faults) are in
 // core/ast_tracker.h and unit-tested on the PC; this file is the glue.
 //
+// After boot the servo is held OFF until `servo <deg>` or `servo auto`
+// (config.h kStartTracking = false), so nothing moves before the bench checks.
+//
 // Serial commands:
 //   servo <deg>     manual mode: move to that panel angle and hold (bench, inclinometer)
 //   servo test      manual steps -45, -30, ... +45, 0 with 8 s at each (command-to-angle check)
