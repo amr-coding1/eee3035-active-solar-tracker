@@ -4,6 +4,9 @@
 · Project hub: https://amr-coding1.github.io/eee3035-active-solar-tracker/
 · Demo with simulated data: [dashboard/?demo=1](https://amr-coding1.github.io/eee3035-active-solar-tracker/dashboard/?demo=1)
 
+**Team: start with [START_HERE.md](START_HERE.md)** for the status, next steps and a map of everything:
+team status, marks playbook, report drafts, bench plan and AI logs.
+
 The data link is AM's part of the Group 8 project (University of Surrey, EEE3035, 2026/27). It
 gets every measurement from the tracker to a secure online store on a timer, analyses it every
 night and shows it on a phone. It covers mandatory product specifications (c) timed transmission
@@ -54,19 +57,19 @@ Figures: [`docs/figures/net_gain_by_month.png`](docs/figures/net_gain_by_month.p
 |---|---|---|
 | Channel 1 "AST raw", one entry per minute | [3578277](https://thingspeak.mathworks.com/channels/3578277) | public-read; simulated test data (marked `s=1`) until the hardware runs |
 | Channel 2 "AST results", one entry per day | [3578278](https://thingspeak.mathworks.com/channels/3578278) | public-read; filled by the nightly job |
-| Nightly job "AST nightly summary (contract v1.5)" | MATLAB Analysis 430132, TimeControl 99365 (00:20 UTC) | dry run until the channel-2 write key is pasted (one step, `docs/SETUP.md`) |
+| Nightly job "AST nightly summary (contract v1.5)" | MATLAB Analysis 430132, TimeControl 99365 (00:20 UTC) | live since 19 Nov (channel-2 write key added); first rows written from the simulated 10–13 Nov data |
 | MATLAB charts with public URLs | [689480](https://thingspeak.mathworks.com/apps/matlab_visualizations/689480) power, [689481](https://thingspeak.mathworks.com/apps/matlab_visualizations/689481) energy, [689485](https://thingspeak.mathworks.com/apps/matlab_visualizations/689485) daily net gain, [689483](https://thingspeak.mathworks.com/apps/matlab_visualizations/689483) angles, [689484](https://thingspeak.mathworks.com/apps/matlab_visualizations/689484) status | embedded on the dashboard |
 
 ## Repository
 
 | Folder | What | Tests |
 |---|---|---|
-| [`firmware/`](firmware/) | Nano ESP32 firmware: `tracker/` (whole tracker), `ast_datalink/` (data link only, bench tests), portable C++17 core, PC host build | 211 unit tests incl. a closed-loop twin (ASan/UBSan), TSan test, both sketches compile with 0 warnings |
+| [`firmware/`](firmware/) | Nano ESP32 firmware: `tracker/` (whole tracker), `ast_datalink/` (data link only, bench tests), portable C++17 core, PC host build | 215 unit tests incl. a closed-loop twin (ASan/UBSan), TSan test, both sketches compile with 0 warnings |
 | [`analysis/`](analysis/) | ThingSpeak MATLAB: nightly job, 5 visualizations, report figures; Python reference of contract section 6 | 41 pytest; every `.m` run in GNU Octave against the reference |
 | [`dashboard/`](dashboard/) | phone web app (no build step, no keys) | 32 unit tests, 9 tests in real Chrome incl. axe-core accessibility |
 | [`tools/`](tools/) | mock ThingSpeak server, Python device simulator | 69 pytest |
 | [`tests/e2e/`](tests/e2e/) | whole chain in virtual time: firmware -> mock ThingSpeak -> nightly job -> dashboard | 129 checks (S1-S12) |
-| [`docs/`](docs/) | [contract](docs/CONTRACT.md), [set-up](docs/SETUP.md), [V&V results](docs/VV_RESULTS.md), [DMP v2](docs/DMP_v2.md), [objectives and FMEA](docs/AM_OBJECTIVES_FMEA.md), [decision matrix](docs/decisions/data_host_matrix.md), [energy budget](docs/energy/), [AI-log entry](docs/AI_LOG_ENTRY_2026-11-13.md), [report plan](docs/REPORT_PLAN_AM.md) | - |
+| [`docs/`](docs/README.md) | [team status](docs/team/STATUS_2026-11-19.md), [marks playbook](docs/team/MARKS_PLAYBOOK.md), [bench runbook](docs/BENCH_RUNBOOK_26NOV.md), [contract](docs/CONTRACT.md), [set-up](docs/SETUP.md), [V&V results](docs/VV_RESULTS.md), [DMP v2](docs/DMP_v2.md), [objectives and FMEA](docs/AM_OBJECTIVES_FMEA.md), [decision matrix](docs/decisions/data_host_matrix.md), [energy budget](docs/energy/), [report plan](docs/REPORT_PLAN_AM.md), [AM report draft](docs/report/AM_REPORT_SECTIONS_DRAFT_v2.md), [AI logs](docs/README.md) | - |
 
 Start with [`docs/CONTRACT.md`](docs/CONTRACT.md): the single specification every part follows.
 
