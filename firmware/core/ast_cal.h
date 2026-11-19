@@ -1,5 +1,5 @@
-// INA226 scaling and two-point calibration maths (portable part of the
-// sensor driver; the I2C access is in ast_datalink/src/esp_ina226.*).
+// INA226/INA219 scaling, chip identification and two-point calibration maths
+// (portable part of the sensor driver; the I2C access is in src/esp_ina.*).
 #pragma once
 #include <stdint.h>
 
@@ -54,5 +54,29 @@ struct InaReading {
   float raw_milliamps = 0;
 };
 InaReading ina226_convert(uint16_t bus_raw, int16_t current_raw, const InaChannelCal& cal);
+
+// ---- INA219 (the four-channel board in the 19 Nov block diagram) ----------------
+// The firmware works with either chip and finds out which one answers at each
+// address. The INA219 has no calibration step here: current is computed from
+// the shunt voltage and the shunt value, so both chips share InaChannelCal.
+constexpr float kIna219BusLsbV = 0.004f;      // bus register bits 15..3: 4 mV/bit
+constexpr float kIna219ShuntLsbV = 0.00001f;  // shunt register: 10 uV/bit (any PGA range)
+// Bus voltage from the raw bus register (bits 2..0 are flags, not data).
+inline float ina219_bus_volts(uint16_t raw) { return static_cast<float>(raw >> 3) * kIna219BusLsbV; }
+// True when the bus register reports a maths overflow (OVF, bit 0): the
+// current/power result is not valid (shunt voltage beyond the PGA range).
+inline bool ina219_overflow(uint16_t bus_raw) { return (bus_raw & 0x1u) != 0; }
+InaReading ina219_convert(uint16_t bus_raw, int16_t shunt_raw, const InaChannelCal& cal);
+
+enum class InaChip : uint8_t { kNone = 0, kIna226 = 1, kIna219 = 2 };
+const char* ina_chip_name(InaChip c);
+// Decides which chip answered, from what the I2C reads returned:
+//   mfg_ok/mfg_id     register 0xFE (INA226: 0x5449 "TI")
+//   die_ok/die_id     register 0xFF (INA226: 0x2260; INA3221, which also says
+//                     "TI", is 0x3220 and is refused)
+//   cfg_ok/cfg_reset  register 0x00 read just after writing the reset bit
+//                     (INA219 power-on value 0x399F)
+// Only addresses 0x40-0x4F are ever probed, so no other kind of chip is reset.
+InaChip ina_identify(bool mfg_ok, uint16_t mfg_id, bool die_ok, uint16_t die_id, bool cfg_ok, uint16_t cfg_reset);
 
 }  // namespace ast

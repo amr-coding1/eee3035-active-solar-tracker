@@ -55,4 +55,35 @@ InaReading ina226_convert(uint16_t bus_raw, int16_t current_raw, const InaChanne
   return r;
 }
 
+InaReading ina219_convert(uint16_t bus_raw, int16_t shunt_raw, const InaChannelCal& cal) {
+  InaReading r;
+  r.raw_volts = ina219_bus_volts(bus_raw);
+  const float shunt_v = static_cast<float>(shunt_raw) * kIna219ShuntLsbV;
+  r.raw_milliamps = cal.scale.shunt_ohm > 0.0f ? shunt_v / cal.scale.shunt_ohm * 1000.0f : 0.0f;
+  r.volts = cal.volts.apply(r.raw_volts);
+  r.milliamps = cal.milliamps.apply(r.raw_milliamps);
+  r.power_mw = r.volts * r.milliamps;
+  return r;
+}
+
+const char* ina_chip_name(InaChip c) {
+  switch (c) {
+    case InaChip::kIna226: return "INA226";
+    case InaChip::kIna219: return "INA219";
+    case InaChip::kNone: break;
+  }
+  return "none";
+}
+
+InaChip ina_identify(bool mfg_ok, uint16_t mfg_id, bool die_ok, uint16_t die_id, bool cfg_ok, uint16_t cfg_reset) {
+  if (mfg_ok && mfg_id == 0x5449) {
+    // A TI part with the INA226 register map. The INA3221 also reports "TI"
+    // but has a different map: refuse it rather than read nonsense.
+    if (die_ok && die_id == 0x3220) return InaChip::kNone;
+    return InaChip::kIna226;
+  }
+  if (cfg_ok && cfg_reset == 0x399F) return InaChip::kIna219;
+  return InaChip::kNone;
+}
+
 }  // namespace ast

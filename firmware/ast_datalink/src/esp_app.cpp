@@ -33,7 +33,7 @@
 #include "core/ast_telemetry.h"
 #include "core/ast_time.h"
 #include "esp_http.h"
-#include "esp_ina226.h"
+#include "esp_ina.h"
 #include "esp_rtc.h"
 #include "esp_settings.h"
 #include "esp_storage.h"
@@ -49,7 +49,8 @@ const uint32_t kNtpWindowOnMs = 60000;     // no valid time: try NTP for 60 s ..
 const uint32_t kNtpWindowOffMs = 240000;   // ... then radio off for 4 min before the next try
 
 // ---- hardware --------------------------------------------------------------------
-const uint8_t kInaAddr[3] = {0x40, 0x41, 0x44};   // tracked, fixed, consumption
+// Power sensors: tracked, fixed, consumption. Addresses come from Defaults.
+const char* const kInaRole[3] = {"tracked", "fixed", "use (5 V feed)"};
 
 struct SystemClock : ast::Clock {
   int64_t now() override { return static_cast<int64_t>(time(nullptr)); }
@@ -91,14 +92,18 @@ class LineQueue {
 
 LineQueue g_lines;
 
+void vlogf(const char* fmt, va_list ap) {
+  char buf[320];
+  vsnprintf(buf, sizeof buf, fmt, ap);
+  g_lines.push(std::string("[") + iso(static_cast<int64_t>(time(nullptr))) + "] " + buf);
+}
+
 void logf(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
 void logf(const char* fmt, ...) {
-  char buf[320];
   va_list ap;
   va_start(ap, fmt);
-  vsnprintf(buf, sizeof buf, fmt, ap);
+  vlogf(fmt, ap);
   va_end(ap);
-  g_lines.push(std::string("[") + iso(static_cast<int64_t>(time(nullptr))) + "] " + buf);
 }
 
 std::atomic<uint32_t> g_radio_session_start_ms{0};
@@ -161,8 +166,10 @@ EspHttp g_http;
 SystemClock g_clock;
 SerialSink g_sink;
 Ds3231 g_rtc;
-Ina226 g_ina[3] = {Ina226(kInaAddr[0]), Ina226(kInaAddr[1]), Ina226(kInaAddr[2])};
+InaSensor g_ina[3];
 ast::DataLink* g_dl = nullptr;
+CommandHook g_hook = nullptr;        // set before app_setup's tasks start; read by loop() only
+const char* g_hook_help = nullptr;
 
 std::mutex g_i2c_mu;                 // Wire bus
 std::mutex g_cfg_mu;                 // g_settings, g_cal_points, g_last_reading, g_radio
@@ -170,6 +177,8 @@ Settings g_settings;
 ast::CalPoint g_cal_points[3][2][2]; // [channel][0 = V, 1 = I][point 1, 2]
 ast::InaReading g_last_reading[3];
 bool g_last_valid[3] = {false, false, false};
+ast::InaChip g_last_chip[3] = {ast::InaChip::kNone, ast::InaChip::kNone, ast::InaChip::kNone};
+uint8_t g_last_addr[3] = {0, 0, 0};
 ast::RadioMeter g_radio;
 
 std::atomic<bool> g_ntp_flag{false};
@@ -185,15 +194,23 @@ void ntp_callback(struct timeval*) { g_ntp_flag.store(true); }
 void read_sensors(ast::Sample1Hz* s) {
   ast::InaReading r[3];
   bool ok[3];
+  ast::InaChip chip[3];
+  uint8_t addr[3];
   {
     std::lock_guard<std::mutex> g(g_i2c_mu);
-    for (int i = 0; i < 3; ++i) ok[i] = g_ina[i].read(&r[i]);
+    for (int i = 0; i < 3; ++i) {
+      ok[i] = g_ina[i].read(&r[i]);
+      chip[i] = g_ina[i].chip();
+      addr[i] = g_ina[i].address();
+    }
   }
   {
     std::lock_guard<std::mutex> g(g_cfg_mu);
     for (int i = 0; i < 3; ++i) {
       g_last_valid[i] = ok[i];
       if (ok[i]) g_last_reading[i] = r[i];
+      g_last_chip[i] = chip[i];
+      g_last_addr[i] = addr[i];
     }
   }
   s->p_trk_valid = ok[0];
@@ -504,26 +521,30 @@ void cmd_power() {
   Serial.printf("radio on  today (UTC) %lu s, sessions since boot %lu, last session %lu s%s\n", static_cast<unsigned long>(today + running),
                 static_cast<unsigned long>(sessions), static_cast<unsigned long>(last), running ? " (session running)" : "");
   Serial.printf("leds      off (power LED is hard-wired)\n");
-  Serial.printf("note      P_use (INA226 0x44) is the measured truth; see the energy budget in firmware/README.md\n");
+  Serial.printf("note      P_use (consumption sensor, 5 V feed) is the measured truth; see docs/energy/power_budget.md\n");
 }
 
 void cmd_cal_show() {
-  static const char* const names[3] = {"trk 0x40", "fix 0x41", "use 0x44"};
+  static const char* const names[3] = {"trk", "fix", "use"};
   for (int i = 0; i < 3; ++i) {
     ast::InaReading r;
     bool ok;
     ast::InaChannelCal cal;
+    uint8_t addr;
+    ast::InaChip chip;
     {
       std::lock_guard<std::mutex> g(g_i2c_mu);
       ok = g_ina[i].read(&r);
       cal = g_ina[i].cal();
+      addr = g_ina[i].address();
+      chip = g_ina[i].chip();
     }
     if (ok) {
-      Serial.printf("%s  raw %.4f V %.3f mA | calibrated %.4f V %.3f mA %.2f mW\n", names[i], static_cast<double>(r.raw_volts),
-                    static_cast<double>(r.raw_milliamps), static_cast<double>(r.volts), static_cast<double>(r.milliamps),
-                    static_cast<double>(r.power_mw));
+      Serial.printf("%s 0x%02X %s  raw %.4f V %.3f mA | calibrated %.4f V %.3f mA %.2f mW\n", names[i], addr, ast::ina_chip_name(chip),
+                    static_cast<double>(r.raw_volts), static_cast<double>(r.raw_milliamps), static_cast<double>(r.volts),
+                    static_cast<double>(r.milliamps), static_cast<double>(r.power_mw));
     } else {
-      Serial.printf("%s  NOT ANSWERING (or just configured: repeat in 2 s)\n", names[i]);
+      Serial.printf("%s 0x%02X  NOT ANSWERING (or just configured: repeat in 2 s)\n", names[i], addr);
     }
     Serial.printf("          shunt %.4f ohm, current LSB %.4f mA, V: x%.5f %+.5f V, I: x%.5f %+.4f mA\n", static_cast<double>(cal.scale.shunt_ohm),
                   static_cast<double>(cal.scale.current_lsb_a * 1000.0f), static_cast<double>(cal.volts.gain), static_cast<double>(cal.volts.offset),
@@ -580,8 +601,14 @@ void handle_command(const std::string& line) {
   using ast::CmdType;
   switch (c.type) {
     case CmdType::kEmpty: break;
-    case CmdType::kError: Serial.printf("error: %s\n", c.error.c_str()); break;
-    case CmdType::kHelp: Serial.print(ast::cli_help()); break;
+    case CmdType::kError:
+      if (g_hook != nullptr && g_hook(line)) break;   // a command of the tracker firmware
+      Serial.printf("error: %s\n", c.error.c_str());
+      break;
+    case CmdType::kHelp:
+      Serial.print(ast::cli_help());
+      if (g_hook_help != nullptr) Serial.print(g_hook_help);
+      break;
     case CmdType::kStatus: cmd_status(); break;
     case CmdType::kTime: cmd_time(); break;
     case CmdType::kTimeSet: cmd_time_set(c.unix_time); break;
@@ -703,9 +730,73 @@ void leds_off() {
 #endif
 }
 
+void print_i2c_scan() {
+  uint8_t found[24];
+  int n;
+  {
+    std::lock_guard<std::mutex> g(g_i2c_mu);
+    n = i2c_scan(found, 24);
+  }
+  if (n == 0) {
+    Serial.printf("I2C (A4 SDA, A5 SCL): nothing answers - check 3V3, GND and the two bus wires\n");
+    return;
+  }
+  Serial.printf("I2C (A4 SDA, A5 SCL): %d device(s):", n);
+  for (int i = 0; i < n; ++i) Serial.printf(" 0x%02X", found[i]);
+  Serial.printf("\n");
+  for (int i = 0; i < n; ++i) {
+    const char* role = "";
+    for (int k = 0; k < 3; ++k) {
+      if (found[i] == g_ina[k].address()) role = kInaRole[k];
+    }
+    Serial.printf("  0x%02X %s%s%s\n", found[i], i2c_guess(found[i]), role[0] ? " -> configured as " : "", role);
+  }
+}
+
 }  // namespace
 
 std::mutex& i2c_mutex() { return g_i2c_mu; }
+
+void app_log(const char* fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vlogf(fmt, ap);
+  va_end(ap);
+}
+
+void app_set_command_hook(CommandHook hook, const char* help_text) {
+  g_hook = hook;
+  g_hook_help = help_text;
+}
+
+PowerSnapshot app_latest_power() {
+  PowerSnapshot p;
+  std::lock_guard<std::mutex> g(g_cfg_mu);
+  for (int i = 0; i < 3; ++i) {
+    p.ok[i] = g_last_valid[i];
+    p.power_mw[i] = g_last_reading[i].power_mw;
+    p.volts[i] = g_last_reading[i].volts;
+    p.milliamps[i] = g_last_reading[i].milliamps;
+    p.chip[i] = g_last_chip[i];
+    p.address[i] = g_last_addr[i];
+  }
+  return p;
+}
+
+Brief app_brief() {
+  Brief b;
+  if (g_dl == nullptr) return b;
+  const ast::DataLinkStatus st = g_dl->status();
+  b.time_valid = st.time_valid;
+  b.radio_on = g_radio_on.load();
+  b.wifi_connected = b.radio_on && WiFi.status() == WL_CONNECTED;
+  b.pending = st.pending;
+  b.last_upload = st.upload.last_success;
+  b.fail_count = st.upload.fail_count;
+  b.fault = st.current_fault;
+  b.sim_on = st.sim_on;
+  return b;
+}
 
 void app_setup(const Defaults& d) {
   Serial.begin(115200);
@@ -714,7 +805,8 @@ void app_setup(const Defaults& d) {
   WiFi.persistent(false);
   WiFi.mode(WIFI_OFF);                // radio off until an upload is due
   delay(300);
-  Serial.printf("\nAST data link - EEE3035 Group 8 - contract %s\n", ast::kContractVersion);
+  Serial.printf("\n%s - EEE3035 Group 8 - contract %s\n", d.banner != nullptr ? d.banner : "AST data link", ast::kContractVersion);
+  for (int i = 0; i < 3; ++i) g_ina[i].set_address(d.ina_addr[i]);
 
   // Settings: secrets.h defaults first, NVS on top.
   g_settings.wifi_ssid = d.wifi_ssid ? d.wifi_ssid : "";
@@ -771,11 +863,16 @@ void app_setup(const Defaults& d) {
     Serial.printf("RTC %s: FAULT 4, not logging until NTP (or `time <ISO>`)\n", rtc_present ? "lost time" : "not found");
   }
 
+  print_i2c_scan();
   for (int i = 0; i < 3; ++i) {
     g_ina[i].set_cal(g_settings.cal[i]);
     ast::InaReading r;
-    g_ina[i].read(&r);   // configures the chip
-    Serial.printf("INA226 0x%02X %s\n", kInaAddr[i], g_ina[i].ok() ? "found" : "NOT FOUND");
+    {
+      std::lock_guard<std::mutex> g(g_i2c_mu);
+      g_ina[i].read(&r);   // identifies and configures the chip
+    }
+    Serial.printf("power sensor %-15s 0x%02X: %s\n", kInaRole[i], g_ina[i].address(),
+                  g_ina[i].ok() ? ast::ina_chip_name(g_ina[i].chip()) : "NOT FOUND (fault 1/2/3 until it answers)");
   }
 
   // Task watchdog: 180 s, panic (= reboot) on expiry (contract 7.4).
@@ -791,6 +888,11 @@ void app_setup(const Defaults& d) {
 }
 
 void app_loop() {
+  app_poll();
+  delay(20);   // yields to the other tasks; the CLI does not need to be faster
+}
+
+void app_poll() {
   static ast::LineReader reader;
   std::string line;
   while (Serial.available() > 0) {
@@ -805,7 +907,6 @@ void app_loop() {
     std::lock_guard<std::mutex> g(g_cfg_mu);
     settings_save_misc(g_settings);
   }
-  delay(20);   // yields to the other tasks; the CLI does not need to be faster
 }
 
 }  // namespace ast_esp
