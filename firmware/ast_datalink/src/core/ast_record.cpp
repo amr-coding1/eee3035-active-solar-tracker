@@ -28,7 +28,7 @@ bool operator==(const Record& a, const Record& b) {
   return a.seq == b.seq && a.minute_unix == b.minute_unix && a.p_trk_dmw == b.p_trk_dmw &&
          a.p_fix_dmw == b.p_fix_dmw && a.p_use_dmw == b.p_use_dmw &&
          a.ang_panel_ddeg == b.ang_panel_ddeg && a.ang_sun_ddeg == b.ang_sun_ddeg &&
-         a.temp_dc == b.temp_dc && a.vbat_mv == b.vbat_mv && a.run == b.run &&
+         a.temp_dc == b.temp_dc && a.vsup_mv == b.vsup_mv && a.run == b.run &&
          a.flags == b.flags && a.state == b.state && a.fault == b.fault;
 }
 
@@ -44,7 +44,7 @@ void encode_record(const Record& r, uint8_t* out) {
   put_u16(out + 24, static_cast<uint16_t>(r.ang_panel_ddeg));
   put_u16(out + 26, static_cast<uint16_t>(r.ang_sun_ddeg));
   put_u16(out + 28, static_cast<uint16_t>(r.temp_dc));
-  put_u16(out + 30, r.vbat_mv);
+  put_u16(out + 30, r.vsup_mv);
   put_u16(out + 32, r.run);
   out[34] = static_cast<uint8_t>(r.state);
   out[35] = r.fault;
@@ -64,7 +64,7 @@ bool decode_record(const uint8_t* in, Record* r) {
   t.ang_panel_ddeg = static_cast<int16_t>(get_u16(in + 24));
   t.ang_sun_ddeg = static_cast<int16_t>(get_u16(in + 26));
   t.temp_dc = static_cast<int16_t>(get_u16(in + 28));
-  t.vbat_mv = get_u16(in + 30);
+  t.vsup_mv = get_u16(in + 30);
   t.run = get_u16(in + 32);
   if (in[34] >= kStateCount || in[35] > 9) return false;
   if ((t.flags & ~kFlagsMask) != 0 || t.seq == 0 || t.minute_unix % 60u != 0) return false;

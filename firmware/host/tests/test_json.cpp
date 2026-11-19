@@ -17,9 +17,9 @@ static Record full(uint32_t seq, uint32_t minute_index) {
   r.ang_panel_ddeg = -305;   // -30.5
   r.ang_sun_ddeg = -298;     // -29.8
   r.temp_dc = 187;           // 18.7
-  r.vbat_mv = 3912;          // 3.912
+  r.vsup_mv = 5012;          // 5.012
   r.run = 12;
-  r.flags = kHasPtrk | kHasPfix | kHasPuse | kHasAngPanel | kHasAngSun | kHasTemp | kHasVbat;
+  r.flags = kHasPtrk | kHasPfix | kHasPuse | kHasAngPanel | kHasAngSun | kHasTemp | kHasVsup;
   r.state = State::TRK;
   return r;
 }
@@ -33,7 +33,7 @@ static std::string entry(const Record& r) {
 TEST(json_entry_exact_text_all_fields) {
   CHECK_STR(entry(full(17, 0)),
             "{\"created_at\":\"2026-11-20 00:00:00 +0000\",\"field1\":1234.5,\"field2\":987.0,"
-            "\"field3\":120.3,\"field4\":-30.5,\"field5\":-29.8,\"field6\":18.7,\"field7\":3.912,"
+            "\"field3\":120.3,\"field4\":-30.5,\"field5\":-29.8,\"field6\":18.7,\"field7\":5.012,"
             "\"field8\":17,\"status\":\"TRK;r=12;p=A;e=0\"}");
 }
 
@@ -42,7 +42,7 @@ TEST(json_unknown_values_are_omitted_never_zero) {
   r.flags = static_cast<uint16_t>(r.flags & ~(kHasAngSun | kHasTemp));
   CHECK_STR(entry(r),
             "{\"created_at\":\"2026-11-20 00:01:00 +0000\",\"field1\":1234.5,\"field2\":987.0,"
-            "\"field3\":120.3,\"field4\":-30.5,\"field7\":3.912,\"field8\":18,"
+            "\"field3\":120.3,\"field4\":-30.5,\"field7\":5.012,\"field8\":18,"
             "\"status\":\"TRK;r=12;p=A;e=0\"}");
   r.flags = 0;   // nothing known at all: only time, seq and status remain
   r.fault = 1;
@@ -87,7 +87,7 @@ TEST(json_batch_exact_text_two_entries) {
   CHECK_STR(b.to_string(),
             "{\"write_api_key\":\"WRITEKEY1001\",\"updates\":["
             "{\"created_at\":\"2026-11-20 00:00:00 +0000\",\"field1\":1234.5,\"field2\":987.0,"
-            "\"field3\":120.3,\"field4\":-30.5,\"field5\":-29.8,\"field6\":18.7,\"field7\":3.912,"
+            "\"field3\":120.3,\"field4\":-30.5,\"field5\":-29.8,\"field6\":18.7,\"field7\":5.012,"
             "\"field8\":1,\"status\":\"TRK;r=12;p=A;e=0\"},"
             "{\"created_at\":\"2026-11-20 00:01:00 +0000\",\"field1\":1234.5,\"field8\":2,"
             "\"status\":\"TRK;r=12;p=A;e=0\"}]}");
@@ -158,7 +158,7 @@ TEST(json_entry_longest_case_fits_buffer) {
   Record r = full(4294967295u, 0);
   r.p_trk_dmw = r.p_fix_dmw = r.p_use_dmw = 2000000000u;
   r.ang_panel_ddeg = r.ang_sun_ddeg = r.temp_dc = -32768;
-  r.vbat_mv = 65535;
+  r.vsup_mv = 65535;
   r.run = 999;
   r.fault = 9;
   r.state = State::MOV;

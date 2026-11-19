@@ -73,7 +73,7 @@ size_t format_entry(const Record& r, char* out, size_t cap) {
   if (r.has(kHasAngPanel)) { format_tenths(r.ang_panel_ddeg, num, sizeof num); o.put(",\"field4\":"); o.put(num); }
   if (r.has(kHasAngSun)) { format_tenths(r.ang_sun_ddeg, num, sizeof num); o.put(",\"field5\":"); o.put(num); }
   if (r.has(kHasTemp)) { format_tenths(r.temp_dc, num, sizeof num); o.put(",\"field6\":"); o.put(num); }
-  if (r.has(kHasVbat)) { format_milli(r.vbat_mv, num, sizeof num); o.put(",\"field7\":"); o.put(num); }
+  if (r.has(kHasVsup)) { format_milli(r.vsup_mv, num, sizeof num); o.put(",\"field7\":"); o.put(num); }
   snprintf(num, sizeof num, "%lu", static_cast<unsigned long>(r.seq));
   o.put(",\"field8\":");
   o.put(num);

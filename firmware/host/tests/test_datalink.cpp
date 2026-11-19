@@ -83,7 +83,7 @@ TEST(datalink_logs_one_record_per_minute_and_uploads_every_15_min) {
   CHECK(d.http.posts[0].body.find("\"created_at\":\"2026-11-20 00:00:00 +0000\"") != std::string::npos);
   CHECK(d.http.posts[0].body.find("\"created_at\":\"2026-11-20 00:14:00 +0000\"") != std::string::npos);
   CHECK(d.http.posts[1].body.find("\"created_at\":\"2026-11-20 00:15:00 +0000\"") != std::string::npos);
-  CHECK(d.http.posts[0].body.find("\"field1\":500.0,\"field2\":400.0,\"field3\":120.0,\"field4\":-10.0,\"field7\":3.900,\"field8\":1,") != std::string::npos);
+  CHECK(d.http.posts[0].body.find("\"field1\":500.0,\"field2\":400.0,\"field3\":120.0,\"field4\":-10.0,\"field7\":5.000,\"field8\":1,") != std::string::npos);
   CHECK_EQ(d.dl.pending(), 0u);
   // F8: a sample is on the server within 16 min of the end of its minute.
   CHECK(d.http.posts[0].t - (kT0 + 60) <= 16 * 60);

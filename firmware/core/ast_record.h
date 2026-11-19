@@ -24,7 +24,7 @@ constexpr uint16_t kHasPuse = 1u << 2;      // field3
 constexpr uint16_t kHasAngPanel = 1u << 3;  // field4
 constexpr uint16_t kHasAngSun = 1u << 4;    // field5
 constexpr uint16_t kHasTemp = 1u << 5;      // field6
-constexpr uint16_t kHasVbat = 1u << 6;      // field7
+constexpr uint16_t kHasVsup = 1u << 6;      // field7
 constexpr uint16_t kSimulated = 1u << 7;    // status key s=1
 constexpr uint16_t kPanelB = 1u << 8;       // status key p=B (clear: p=A)
 constexpr uint16_t kFlagsMask = 0x01FFu;
@@ -38,7 +38,7 @@ struct Record {
   int16_t ang_panel_ddeg = 0;  // 0.1 deg, east negative
   int16_t ang_sun_ddeg = 0;
   int16_t temp_dc = 0;         // 0.1 degC
-  uint16_t vbat_mv = 0;        // 1 mV
+  uint16_t vsup_mv = 0;        // 1 mV
   uint16_t run = 0;            // status key r
   uint16_t flags = 0;
   State state = State::IDL;
@@ -54,7 +54,7 @@ inline bool operator!=(const Record& a, const Record& b) { return !(a == b); }
 // On-flash layout (little-endian), 40 bytes:
 //   0 magic 0xA5 | 1 format version 1 | 2-3 flags | 4-7 seq | 8-11 minute_unix
 //   12-15 p_trk | 16-19 p_fix | 20-23 p_use | 24-25 ang_panel | 26-27 ang_sun
-//   28-29 temp | 30-31 vbat | 32-33 run | 34 state | 35 fault | 36-39 CRC-32 of 0..35
+//   28-29 temp | 30-31 vsup | 32-33 run | 34 state | 35 fault | 36-39 CRC-32 of 0..35
 constexpr size_t kRecordSize = 40;
 constexpr uint8_t kRecordMagic = 0xA5;
 constexpr uint8_t kRecordFormat = 1;

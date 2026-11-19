@@ -202,9 +202,10 @@ void read_sensors(ast::Sample1Hz* s) {
   s->p_fix_mw = r[1].power_mw;
   s->p_use_valid = ok[2];
   s->p_use_mw = r[2].power_mw;
-  // The consumption sensor sits in the battery line: its bus voltage is V_bat.
-  s->vbat_valid = ok[2];
-  s->vbat_v = r[2].volts;
+  // The consumption sensor sits in the 5 V feed to the tracker (19 Nov wiring
+  // correction): its bus voltage is the supply rail, field7 V_supply.
+  s->vsup_valid = ok[2];
+  s->vsup_v = r[2].volts;
 }
 
 void sampler_task(void*) {
@@ -465,19 +466,19 @@ void cmd_buffer_dump(uint32_t n) {
   }
   std::vector<ast::Record> recs(n);
   const size_t got = g_dl->dump_newest(recs.data(), n);
-  Serial.printf("seq,created_at_utc,p_trk_mw,p_fix_mw,p_use_mw,ang_panel_deg,ang_sun_deg,temp_c,vbat_v,status\n");
+  Serial.printf("seq,created_at_utc,p_trk_mw,p_fix_mw,p_use_mw,ang_panel_deg,ang_sun_deg,temp_c,v_supply_v,status\n");
   for (size_t i = 0; i < got; ++i) {
     const ast::Record& r = recs[i];
     char f[7][16];
     const bool has[7] = {r.has(ast::kHasPtrk), r.has(ast::kHasPfix), r.has(ast::kHasPuse), r.has(ast::kHasAngPanel),
-                         r.has(ast::kHasAngSun), r.has(ast::kHasTemp), r.has(ast::kHasVbat)};
+                         r.has(ast::kHasAngSun), r.has(ast::kHasTemp), r.has(ast::kHasVsup)};
     ast::format_tenths(r.p_trk_dmw, f[0], sizeof f[0]);
     ast::format_tenths(r.p_fix_dmw, f[1], sizeof f[1]);
     ast::format_tenths(r.p_use_dmw, f[2], sizeof f[2]);
     ast::format_tenths(r.ang_panel_ddeg, f[3], sizeof f[3]);
     ast::format_tenths(r.ang_sun_ddeg, f[4], sizeof f[4]);
     ast::format_tenths(r.temp_dc, f[5], sizeof f[5]);
-    ast::format_milli(r.vbat_mv, f[6], sizeof f[6]);
+    ast::format_milli(r.vsup_mv, f[6], sizeof f[6]);
     char status[ast::kStatusMax];
     ast::build_status(r, status, sizeof status);
     Serial.printf("%lu,%s", static_cast<unsigned long>(r.seq), iso(r.minute_unix).c_str());

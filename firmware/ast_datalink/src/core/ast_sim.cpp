@@ -236,16 +236,17 @@ Sample1Hz Simulator::step(int64_t t) {
 
   Sample1Hz s;
   s.simulated = true;
-  s.p_trk_valid = s.p_fix_valid = s.p_use_valid = s.vbat_valid = true;
+  s.p_trk_valid = s.p_fix_valid = s.p_use_valid = s.vsup_valid = true;
   s.p_trk_mw = static_cast<float>(cfg_.panel_rated_mw * g_trk / 1000.0 * derate * (1.0 + 0.01 * noise_b));
   s.p_fix_mw = static_cast<float>(cfg_.panel_rated_mw * g_fix / 1000.0 * derate * (1.0 + 0.01 * noise_c));
   // Own use: quiescent draw with a slow ripple (Wi-Fi beacons, regulator) plus
   // the motor while it runs. Stays within 100-150 mW when the motor is off.
   const double ripple = 12.0 * sin(2.0 * kPi * static_cast<double>(((t % 900) + 900) % 900) / 900.0);
   s.p_use_mw = static_cast<float>(cfg_.base_use_mw + ripple + 16.0 * noise_a + (motor ? cfg_.motor_use_mw : 0.0));
-  // Battery: sags a little overnight, recovers with light on the panel.
-  const double charge = clampd(g_fix / 400.0, 0.0, 1.0);
-  s.vbat_v = static_cast<float>(3.78 + 0.28 * charge + 0.004 * noise_b);
+  // Supply rail (field7 V_supply): the 5 V feed to the tracker, measured by the
+  // consumption sensor. Sags slightly with load (cable and power-bank output
+  // resistance, about 0.15 ohm here) and a lot while the actuator moves.
+  s.vsup_v = static_cast<float>(5.05 - 0.00015 * static_cast<double>(s.p_use_mw) + 0.004 * noise_b);
   s.ang_panel_valid = true;
   s.ang_panel_deg = static_cast<float>(panel_deg_);
   s.ang_sun_valid = sun_seen;

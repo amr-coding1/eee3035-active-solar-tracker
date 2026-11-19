@@ -16,9 +16,9 @@ static Record make(uint32_t minute_index, uint32_t p = 1234) {
   r.ang_panel_ddeg = -123;
   r.ang_sun_ddeg = -120;
   r.temp_dc = 215;
-  r.vbat_mv = 3912;
+  r.vsup_mv = 3912;
   r.run = 12;
-  r.flags = kHasPtrk | kHasPfix | kHasPuse | kHasAngPanel | kHasAngSun | kHasTemp | kHasVbat;
+  r.flags = kHasPtrk | kHasPfix | kHasPuse | kHasAngPanel | kHasAngSun | kHasTemp | kHasVsup;
   r.state = State::TRK;
   return r;
 }

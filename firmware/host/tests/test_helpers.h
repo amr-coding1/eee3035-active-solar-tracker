@@ -95,7 +95,7 @@ struct VecSource : ast::RecordSource {
       r.seq = static_cast<uint32_t>(recs.size() + 1);
       r.minute_unix = static_cast<uint32_t>(first_minute + 60 * static_cast<int64_t>(recs.size()));
       r.p_trk_dmw = 1000 + r.seq;
-      r.flags = ast::kHasPtrk | ast::kHasPfix | ast::kHasPuse | ast::kHasAngPanel | ast::kHasVbat;
+      r.flags = ast::kHasPtrk | ast::kHasPfix | ast::kHasPuse | ast::kHasAngPanel | ast::kHasVsup;
       r.state = ast::State::TRK;
       recs.push_back(r);
     }
@@ -150,11 +150,11 @@ struct EventLog : ast::EventSink {
 // A real 1 Hz sample with everything valid.
 inline ast::Sample1Hz sample(float trk = 500.0f, float fix = 400.0f, float use = 120.0f) {
   ast::Sample1Hz s;
-  s.p_trk_valid = s.p_fix_valid = s.p_use_valid = s.vbat_valid = s.ang_panel_valid = true;
+  s.p_trk_valid = s.p_fix_valid = s.p_use_valid = s.vsup_valid = s.ang_panel_valid = true;
   s.p_trk_mw = trk;
   s.p_fix_mw = fix;
   s.p_use_mw = use;
-  s.vbat_v = 3.9f;
+  s.vsup_v = 5.0f;
   s.ang_panel_deg = -10.0f;
   s.state = ast::State::TRK;
   return s;

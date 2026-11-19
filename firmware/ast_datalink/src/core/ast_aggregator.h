@@ -1,5 +1,5 @@
 // 1 Hz samples -> one Record per UTC minute (contract 7.1, 3.1).
-//   powers, V_bat, T_panel : mean of the valid 1 Hz readings in [t, t+60 s)
+//   powers, V_supply, T_panel : mean of the valid 1 Hz readings in [t, t+60 s)
 //   angles, state, run, panel : value of the LAST 1 Hz sample of the minute
 //   state MOV  : if the motor ran at any time in the minute (FLT is kept)
 //   control fault code : last non-zero code seen in the minute
@@ -14,9 +14,9 @@ namespace ast {
 
 struct Sample1Hz {
   bool p_trk_valid = false, p_fix_valid = false, p_use_valid = false;
-  bool vbat_valid = false, ang_panel_valid = false, ang_sun_valid = false, temp_valid = false;
+  bool vsup_valid = false, ang_panel_valid = false, ang_sun_valid = false, temp_valid = false;
   float p_trk_mw = 0, p_fix_mw = 0, p_use_mw = 0;
-  float vbat_v = 0;
+  float vsup_v = 0;
   float ang_panel_deg = 0, ang_sun_deg = 0;
   float temp_c = 0;
   State state = State::IDL;
@@ -57,7 +57,7 @@ class Aggregator {
 
   int64_t minute_ = 0;
   int count_ = 0;
-  Mean p_trk_, p_fix_, p_use_, vbat_, temp_;
+  Mean p_trk_, p_fix_, p_use_, vsup_, temp_;
   Sample1Hz last_;
   bool motor_ran_ = false;
   bool any_simulated_ = false;

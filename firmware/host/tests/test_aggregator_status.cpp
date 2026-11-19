@@ -26,8 +26,8 @@ TEST(aggregator_one_record_per_minute_with_mean_power) {
   CHECK_EQ(r.p_trk_dmw, 295u);
   CHECK_EQ(r.p_fix_dmw, 1000u);
   CHECK_EQ(r.p_use_dmw, 1200u);
-  CHECK_EQ(r.vbat_mv, 3900);
-  CHECK(r.has(kHasPtrk) && r.has(kHasPfix) && r.has(kHasPuse) && r.has(kHasVbat) && r.has(kHasAngPanel));
+  CHECK_EQ(r.vsup_mv, 5000);
+  CHECK(r.has(kHasPtrk) && r.has(kHasPfix) && r.has(kHasPuse) && r.has(kHasVsup) && r.has(kHasAngPanel));
   CHECK(!r.has(kHasAngSun));
   CHECK(!r.has(kHasTemp));
   CHECK(!r.has(kSimulated));
@@ -132,14 +132,14 @@ TEST(aggregator_unknown_values_are_flagged_not_zero) {
   for (int s = 0; s < 60; ++s) {
     Sample1Hz x = sample();
     x.p_fix_valid = false;                 // fixed-panel sensor missing all minute
-    x.vbat_valid = false;
+    x.vsup_valid = false;
     x.ang_panel_valid = false;
     a.add(kT0 + s, x, &r);
   }
   CHECK(a.flush(kT0 + 60, &r));
   CHECK(r.has(kHasPtrk));
   CHECK(!r.has(kHasPfix));
-  CHECK(!r.has(kHasVbat));
+  CHECK(!r.has(kHasVsup));
   CHECK(!r.has(kHasAngPanel));
   CHECK_EQ(sensor_fault_from_flags(r.flags), 2);
 }
