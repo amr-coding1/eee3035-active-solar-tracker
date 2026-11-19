@@ -19,3 +19,7 @@ so replace the E_use estimates with the bench measurement (INA226 0x44) when the
 | Nov | 10.1 | 8.6 | +17 % | -39 % | -10 % | +14 % |
 | Dec | 6.7 | 6.0 | +12 % | -68 % | -27 % | +8 % |
 | **Year** | 19.7 | 15.2 | **+29 %** | **-2 %** | **+14 %** | **+28 %** |
+
+## Update (AM, 19 Nov 2026)
+
+The three net columns use loads of 4.8, 2.3 and 0.24 Wh/day. Those leave out the 5 V converter loss, the power LED, the photodiode bias, the motor driver and the motor (and, for light sleep, the uploads). The bottom-up model in `power_budget.md` gives 5.02, 3.11 and 0.53 Wh/day for the same three cases. The tracked, fixed and gross columns don't change. Over the year the net figures become -4 %, +9 % and +26 %, and the data link as built now loses in five months (October to February) instead of four. Light sleep still gains in every month, with a smaller margin in December. These are still model figures until P_use is measured on 26 Nov.
