@@ -278,3 +278,11 @@ Details and results: `TESTS.md`.
 - One-second samples are taken on the FreeRTOS tick, not locked to the RTC
   second; a minute can contain 59 or 61 samples.
 - The optional `arduino:esp32` 2.0.18 core was not tried (large download).
+
+## Correction (AM, 19 Nov 2026)
+
+Apply these before the 26 Nov bench session:
+
+- **INA226 #3 (0x44) goes in the 5 V feed to the tracker, not the battery line** (wiring table above, and step 1 of the energy follow-up). With the Solar Power Manager the battery line also carries the charging current, so P_use can't be separated from charging there. In the 5 V feed it sees only what the tracker draws: MCU, sensors, driver and motor. Its bus voltage (field7, `V_bat`) will then read the 5 V rail, not the battery.
+- **Power the Nano ESP32 through its USB-C port.** VBUS is not a power input on this board, and VIN expects 6–21 V.
+- **The 2.3 Wh/day estimate is low.** It leaves out the converter loss, the power LED, the photodiode bias and the motor driver. With those the firmware as built comes to about 3.11 Wh/day (130 mW). See `docs/energy/power_budget.md`; bench steps are in `docs/BENCH_RUNBOOK_26NOV.md`.
