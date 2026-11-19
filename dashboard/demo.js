@@ -102,7 +102,7 @@ function simulateDay(day, offset, seqStart, untilMs) {
     }
     f.field3 = use.toFixed(1);
     f.field4 = panel.toFixed(1);
-    f.field7 = (3.95 - 0.1 * (m / 1440) + (rand() - 0.5) * 0.01).toFixed(3);
+    f.field7 = (5.05 - 0.00015 * use + (rand() - 0.5) * 0.01).toFixed(3); // V_supply: 5 V feed, sags slightly with load
     f.field8 = String(seq);
     f.status = `${state};r=${run};p=${onTracker};e=${fault};s=1`;
     const lost = (offset === -1 && m >= 790 && m < 805) || (offset === -2 && m >= 540 && m < 580);

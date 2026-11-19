@@ -426,7 +426,7 @@ end
 function d = read_raw_csv(csv_file)
 % Dashboard raw export -> struct of columns. Numbers: NaN when empty.
     header = {'created_at_utc', 'time_uk', 'entry_id', 'seq', 'p_trk_mw', 'p_fix_mw', 'p_use_mw', 'ang_panel_deg', ...
-              'ang_sun_deg', 'temp_c', 'vbat_v', 'state', 'run', 'panel', 'fault', 'sim', 'status'};
+              'ang_sun_deg', 'temp_c', 'v_supply_v', 'state', 'run', 'panel', 'fault', 'sim', 'status'};
     txt = fileread(csv_file);
     if ~isempty(txt) && double(txt(1)) == 65279
         txt = txt(2:end);                                % byte-order mark

@@ -68,7 +68,7 @@ class Client:
 def upd(minute, seq=None, t0=T0, **extra):
     ts = time.strftime("%Y-%m-%d %H:%M:%S +0000", time.gmtime(t0 + 60 * minute))
     u = {"created_at": ts, "field1": 1000.5 + minute, "field2": 800.0, "field3": 120.0, "field4": -10.0,
-         "field7": 3.912, "field8": seq if seq is not None else minute + 1, "status": "TRK;r=1;p=A;e=0;s=1"}
+         "field7": 5.012, "field8": seq if seq is not None else minute + 1, "status": "TRK;r=1;p=A;e=0;s=1"}
     u.update(extra)
     return u
 
@@ -261,13 +261,13 @@ def test_duplicate_created_at_rejected_when_configured():
 
 def test_numbers_as_strings_missing_as_null(srv):
     raw = ('{"write_api_key":"%s","updates":[{"created_at":"2026-11-20 00:00:00 +0000",'
-           '"field1":1234.5,"field2":0.0,"field7":3.910,"field8":7,"status":"IDL;r=0;p=A;e=0"}]}' % W1)
+           '"field1":1234.5,"field2":0.0,"field7":5.010,"field8":7,"status":"IDL;r=0;p=A;e=0"}]}' % W1)
     assert srv.req("POST", "/channels/%d/bulk_update.json" % CH1, raw.encode(),
                    headers={"Content-Type": "application/json"})[0] == 202
     s, body, _ = srv.feeds(results=1, status="true")
     f = body["feeds"][0]
     assert f["field1"] == "1234.5" and f["field2"] == "0.0"
-    assert f["field7"] == "3.910"          # exact text preserved
+    assert f["field7"] == "5.010"          # exact text preserved
     assert f["field8"] == "7"
     assert f["field3"] is None and f["field5"] is None and f["field6"] is None
     assert f["status"] == "IDL;r=0;p=A;e=0"

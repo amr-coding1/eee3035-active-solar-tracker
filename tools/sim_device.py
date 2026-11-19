@@ -66,7 +66,7 @@ numbers below are this tool's assumptions, chosen to look like the real rig):
   * tracker re-aims every 20 minutes, half an interval ahead of the sun (state
     MOV in that minute), holds (HLD)
     when the sun sensor sees no direct light, idles level (IDL) in the dark.
-  * own use about 105 mW plus motor bursts (about 2.8 W while moving).
+  * own use about 105 mW plus servo bursts (about 2.8 W while moving).
   * runs 900-999 (calibration): both panels fixed at 0, state STW.
 The data are a pure function of (seed, time, scenario, run, panel), so a
 restarted device reproduces the same values for the same minute.
@@ -294,7 +294,7 @@ class World:
         p_fix = P_RATED_MW * g_fix / 1000.0 * derate * PANEL_FACTOR[on_fix] * (1 + 0.004 * _gauss(self.seed, "pf", minute))
         p_use = (96.0 if end["dark"] else 106.0) + 5.0 * _gauss(self.seed, "pu", minute)
         if moved:
-            p_use += 2800.0 * (moved / 4.0 + 0.5) / 60.0   # motor at 4 deg/s
+            p_use += 2800.0 * (moved / 4.0 + 0.5) / 60.0   # servo at 4 deg/s
         if minute % self.upload_min == 0:
             p_use += 28.0                                  # Wi-Fi burst for the upload
         if self._calibration():
@@ -310,12 +310,12 @@ class World:
         sun_angle = None
         if end["known"] and end["theta"] is not None:
             sun_angle = end["theta"] + 0.3 * _gauss(self.seed, "sa", minute)
-        hour = (t % 86400) / 3600.0
-        vbat = 3.92 + 0.12 * math.sin(2 * math.pi * (hour - 9.0) / 24.0) + 0.002 * _gauss(self.seed, "vb", minute)
+        # field7 V_supply: 5 V feed to the tracker, sagging slightly with the load (as firmware/core/ast_sim.cpp)
+        v_supply = 5.05 - 0.00015 * max(0.0, p_use) + 0.002 * _gauss(self.seed, "vb", minute)
         return {
             "t": int(t),
             "p_trk": max(0.0, p_trk), "p_fix": max(0.0, p_fix), "p_use": max(0.0, p_use),
-            "ang_panel": angle, "ang_sun": sun_angle, "temp": temp, "vbat": vbat, "state": state,
+            "ang_panel": angle, "ang_sun": sun_angle, "temp": temp, "v_supply": v_supply, "state": state,
         }
 
     def _warm(self, t):
@@ -331,7 +331,7 @@ def record_json(rec):
         parts.append('"field5":%.1f' % rec["ang_sun"])
     if rec.get("temp") is not None:
         parts.append('"field6":%.1f' % rec["temp"])
-    parts.append('"field7":%.3f' % rec["vbat"])
+    parts.append('"field7":%.3f' % rec["v_supply"])
     parts.append('"field8":%d' % rec["seq"])
     parts.append('"status":%s' % json.dumps(rec["status"]))
     return "{" + ",".join(parts) + "}"
@@ -565,7 +565,7 @@ class Device:
         rec = {"seq": self.seq, "t": t, "p_trk": round(s["p_trk"], 1), "p_fix": round(s["p_fix"], 1),
                "p_use": round(s["p_use"], 1), "ang_panel": round(s["ang_panel"], 1),
                "ang_sun": None if s["ang_sun"] is None else round(s["ang_sun"], 1),
-               "temp": round(s["temp"], 1), "vbat": round(s["vbat"], 3),
+               "temp": round(s["temp"], 1), "v_supply": round(s["v_supply"], 3),
                "status": status_string(state, self.run, self.panel, fault)}
         if fault:
             self.event(boundary, "fault", e=fault, seq=self.seq)
@@ -847,7 +847,7 @@ def csv_row(rec):
     cells = [when, "%.1f" % rec["p_trk"], "%.1f" % rec["p_fix"], "%.1f" % rec["p_use"], "%.1f" % rec["ang_panel"],
              "" if rec.get("ang_sun") is None else "%.1f" % rec["ang_sun"],
              "" if rec.get("temp") is None else "%.1f" % rec["temp"],
-             "%.3f" % rec["vbat"], "%d" % rec["seq"], rec["status"]]
+             "%.3f" % rec["v_supply"], "%d" % rec["seq"], rec["status"]]
     return ",".join(cells)       # no cell contains a comma or a quote (status uses ';' and '=')
 
 

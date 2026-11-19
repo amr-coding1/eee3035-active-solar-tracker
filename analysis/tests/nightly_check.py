@@ -132,7 +132,7 @@ def build_dataset_a():
     t19 = ast_sim.day_start_s("2026-11-19")
     for m in range(600, 720):
         first.append({"created_at": ast_sim.created_at(t19 + m * 60), "field1": "500.0", "field2": "450.0",
-                      "field3": "50.0", "field4": "10.0", "field5": "11.0", "field7": "3.900",
+                      "field3": "50.0", "field4": "10.0", "field5": "11.0", "field7": "5.020",
                       "field8": "%d" % ((m - 600) % 60 + 1), "status": "TRK;r=1;p=A;e=0"})
 
     day20, seq = ast_sim.simulate_day("2026-11-20", seq, "clear", 1, "A", seed=1, sim=False)

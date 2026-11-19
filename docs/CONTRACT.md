@@ -12,7 +12,7 @@ location" and (iii) "timed data display and analysis on a portable device"
 ## 1. Architecture
 
 ```
- sensors (3x INA226, angle, sun arc, temp)            ThingSpeak (free licence)
+ sensors (3x INA226/INA219, angle, sun arc, temp)     ThingSpeak (free licence)
         |  1 Hz                                    +---------------------------+
  [ESP32 sampler task] -- 60 s means --> LittleFS   | ch1 "AST raw"   (1/min)   |
         ring buffer (>= 8 days) --> [uploader task]-HTTPS bulk_update every 15 min-> |
@@ -44,11 +44,11 @@ read, MATLAB code must finish within 20 s, TimeControl no faster than every
 |---|---|---|---|---|
 | field1 | P_trk | mW | 1 dp | mean output power of the TRACKED panel over the minute |
 | field2 | P_fix | mW | 1 dp | mean output power of the FIXED panel over the minute |
-| field3 | P_use | mW | 1 dp | mean power drawn by the tracker itself: everything it draws (MCU with Wi-Fi, sensors, driver, motor), so INA226 0x44 sits on the whole tracker supply line (scope confirmed by Lem, 17 Nov 2026) |
+| field3 | P_use | mW | 1 dp | mean power drawn by the tracker itself: everything it draws (MCU with Wi-Fi, sensors, servo), so the consumption sensor (INA226 or INA219, auto-detected; I2C 0x44) sits on the whole tracker supply line (scope confirmed by Lem, 17 Nov 2026) |
 | field4 | θ_panel | ° | 1 dp | panel angle about the tracking axis at the end of the minute; 0 = level, east negative, west positive |
 | field5 | θ_sun | ° | 1 dp | sun angle from the sensor arc on the same axis; OMITTED when unknown (dark, cloud, fault) |
 | field6 | T_panel | °C | 1 dp | panel temperature; OMITTED when no sensor fitted (SHOULD requirement F6) |
-| field7 | V_bat | V | 3 dp | tracker battery voltage |
+| field7 | V_supply | V | 3 dp | tracker supply voltage: bus voltage of the consumption sensor, which sits in the 5 V feed to the tracker |
 | field8 | seq | – | integer | sample sequence number, starts at 1, +1 per logged sample, persisted across reboots, never reused |
 | status | – | – | text | section 4 |
 | created_at | – | UTC | `YYYY-MM-DD HH:MM:00 +0000` | start of the one-minute interval the entry covers |
@@ -93,7 +93,7 @@ example : TRK;r=12;p=A;e=0          real sample
 | STATE | Words on the dashboard | Counts for pointing error? |
 |---|---|---|
 | TRK | Tracking | yes |
-| MOV | Moving (motor ran this minute) | yes |
+| MOV | Moving (servo moved this minute) | yes |
 | HLD | Holding (sensor uncertain) | yes |
 | IDL | Idle (dark) | no |
 | STW | Stowed | no |
@@ -102,8 +102,8 @@ example : TRK;r=12;p=A;e=0          real sample
 Fault codes `e`: 0 none; 1 tracked-panel power sensor missing; 2 fixed-panel
 power sensor missing; 3 consumption power sensor missing; 4 clock (RTC)
 missing or lost time; 5 sun-sensor arc fault; 6 local buffer overflow (data
-lost); 7 limit switch hit unexpectedly; 8 motor stall or timeout; 9 upload
-failing for over 60 minutes. One code per sample: the control system's code
+lost); 7 travel limit: angle command outside the safe range; 8 servo stall,
+overload or clutch slip; 9 upload failing for over 60 minutes. One code per sample: the control system's code
 wins when non-zero, otherwise the data link's own (4, 6, 9 in that priority).
 
 Unknown keys are ignored by every reader (forward compatibility).
@@ -163,7 +163,7 @@ null also matches), and N matches exactly.
   (no eduroam credentials on the device).
 - 1 Hz reads; each logged sample is the mean over the UTC minute
   [t, t+60 s) for powers, instantaneous end-of-minute values for angles and
-  state; `MOV` if the motor ran at any time in the minute.
+  state; `MOV` if the servo moved at any time in the minute.
 - Time: DS3231 RTC in UTC, disciplined by NTP when online (set RTC when
   |RTC - NTP| > 2 s). If the RTC reports lost time (oscillator-stop flag) and
   NTP has not succeeded since boot, samples are NOT logged and fault 4 is
@@ -231,14 +231,14 @@ simulated sample carries `s=1`. Never mixed silently with real data.
 ### 7.6 Serial CLI (115200 baud)
 `help`, `status`, `time [<ISO>]`, `buffer [dump [n] | clear yes]`, `upload`
 (now), `upload every <5-60>`, `run <id>`, `panel A|B`, `sim on [<scenario>]|off`,
-`cal` (two-point INA226 calibration against the bench DMM, stored in NVS),
+`cal` (two-point power-sensor calibration against the bench DMM, stored in NVS),
 `power`, `wifi <ssid> <pass>`, `keys <ch1> <write> [read]`, `reboot`.
 
 ### 7.7 Interface to the rest of the firmware
 See `firmware/INTERFACE.md`: the control system calls
 `ast::telemetry_set_angles()`, `ast::telemetry_set_state()`, etc. once per
-second; the data link owns the INA226 reads (power system lead supplies the
-shunt values) and everything after that.
+second; the data link owns the power-sensor reads (INA226 or INA219, auto-detected;
+the power system lead supplies the shunt values) and everything after that.
 
 ## 8. Read API (dashboard and MATLAB)
 
@@ -277,6 +277,14 @@ clock (see the file header).
   <= 17 min.
 
 ## 12. Change log
+- v1.5 note (19 Nov 2026, wire format unchanged, still `v=1.5`): field7 is renamed
+  V_bat -> V_supply. The consumption sensor now sits in the 5 V feed to the tracker,
+  so field7 is the supply-rail voltage, not a battery voltage. It stays in the CSV
+  export (column `v_supply_v`) and is not shown on the dashboard. The actuator is a
+  power-gated DS-R001 servo (no motor driver, no limit switches), so fault 7 now
+  reads "Travel limit: angle command outside the safe range", fault 8 "Servo stall,
+  overload or clutch slip" and MOV "Moving (servo moved this minute)". The power
+  sensors are INA226 or INA219; the firmware detects which. Channel 2 is unchanged.
 - v1.5 note (18 Nov 2026, no field meaning changed, still `v=1.5`): field3 P_use is
   confirmed as everything the tracker draws (Lem, 17 Nov), so net gain in 6.2 already
   counts the MCU, Wi-Fi, sensors, driver and motor.

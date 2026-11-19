@@ -94,10 +94,11 @@ test('saved config: only with no default channel and not in demo mode', () => {
 });
 
 test('exports: headers, sim flags, unrounded numbers', () => {
-  const f = { created_at: '2026-11-20T10:00:00Z', entry_id: 7, field1: '600.25', field2: '500', field3: '100', field4: '1', field5: '2', field6: '20', field7: '3.9', field8: '11', status: 'TRK;r=3;p=A;e=0;s=1' };
+  const f = { created_at: '2026-11-20T10:00:00Z', entry_id: 7, field1: '600.25', field2: '500', field3: '100', field4: '1', field5: '2', field6: '20', field7: '5.02', field8: '11', status: 'TRK;r=3;p=A;e=0;s=1' };
   const e = parseFeed(f);
   const raw = rawCsv([e], '2026-11-20', '2026-11-20');
   assert.equal(raw.header[0], 'created_at_utc'); assert.equal(raw.rows[0][0], '2026-11-20T10:00:00Z');
+  assert.equal(raw.rows[0][raw.header.indexOf('v_supply_v')], '5.02'); assert.equal(raw.header.indexOf('vbat_v'), -1);
   assert.equal(raw.rows[0][raw.header.indexOf('sim')], 1); assert.equal(raw.rows[0][raw.header.indexOf('p_trk_mw')], '600.25');
   const runs = runsCsv(runSummaries([e]), 'a', 'b');
   assert.equal(runs.rows[0][runs.header.indexOf('n_sim')], 1);

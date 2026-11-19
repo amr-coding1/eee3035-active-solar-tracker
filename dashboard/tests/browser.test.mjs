@@ -157,7 +157,7 @@ test('CSV export downloads with the documented header', async () => {
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#csv-raw')]);
   const text = readFileSync(await dl.path(), 'utf8');
   assert.match(dl.suggestedFilename(), /^G8_raw_\d{8}-\d{8}\.csv$/);   // DMP naming rule
-  assert.equal(text.split('\r\n')[0], 'created_at_utc,time_uk,entry_id,seq,p_trk_mw,p_fix_mw,p_use_mw,ang_panel_deg,ang_sun_deg,temp_c,vbat_v,state,run,panel,fault,sim,status');
+  assert.equal(text.split('\r\n')[0], 'created_at_utc,time_uk,entry_id,seq,p_trk_mw,p_fix_mw,p_use_mw,ang_panel_deg,ang_sun_deg,temp_c,v_supply_v,state,run,panel,fault,sim,status');
   await ctx.close();
 });
 

@@ -24,13 +24,13 @@ def iso(ms):
 
 
 def feed(minute, seq, trk="100.0", fix="80.0", use="5.0", panel="0.0", sun="0.0",
-         status="TRK;r=1;p=A;e=0", entry_id=None, day_ms=T0, temp=None, vbat="3.900"):
+         status="TRK;r=1;p=A;e=0", entry_id=None, day_ms=T0, temp=None, v_supply="5.020"):
     """One ThingSpeak-style channel-1 feed object (strings, None = null)."""
     return {
         "created_at": iso(day_ms + minute * am.MIN_MS),
         "entry_id": entry_id if entry_id is not None else (seq if seq is not None else 10_000 + minute),
         "field1": trk, "field2": fix, "field3": use, "field4": panel, "field5": sun,
-        "field6": temp, "field7": vbat, "field8": None if seq is None else str(seq), "status": status,
+        "field6": temp, "field7": v_supply, "field8": None if seq is None else str(seq), "status": status,
     }
 
 
@@ -92,12 +92,12 @@ def test_parse_time_formats():
 
 def test_parse_feed_fields_and_nulls():
     e = am.parse_feed({"created_at": "2026-11-20T10:05:00Z", "entry_id": 77, "field1": "250.4", "field2": "200.1",
-                       "field3": "12.0", "field4": "-12.5", "field5": None, "field6": None, "field7": "3.912",
+                       "field3": "12.0", "field4": "-12.5", "field5": None, "field6": None, "field7": "5.012",
                        "field8": "4321", "status": "HLD;r=3;p=B;e=5"})
     assert e["t"] == T0 + 605 * am.MIN_MS
     assert (e["p_trk"], e["p_fix"], e["p_use"], e["ang_panel"]) == (250.4, 200.1, 12.0, -12.5)
     assert e["ang_sun"] is None and e["temp"] is None
-    assert e["vbat"] == 3.912 and e["seq"] == 4321 and e["entry_id"] == 77
+    assert e["v_supply"] == 5.012 and e["seq"] == 4321 and e["entry_id"] == 77
     assert (e["state"], e["run"], e["panel"], e["fault"], e["sim"]) == ("HLD", 3, "B", 5, False)
     # a channel that does not have field6 enabled does not send the key at all
     e2 = am.parse_feed({"created_at": "2026-11-20T10:05:00Z", "entry_id": 1})
@@ -602,8 +602,8 @@ def test_read_raw_csv(tmp_path):
     p = tmp_path / "raw.csv"
     p.write_text(
         ",".join(am.RAW_CSV_HEADER) + "\r\n"
-        "2026-11-20T00:00:00Z,2026-11-20 00:00:00,11,1,120,100,5,0,1,,3.9,TRK,1,A,0,1,TRK;r=1;p=A;e=0;s=1\r\n"
-        "2026-11-20T00:01:00Z,2026-11-20 00:01:00,12,2,120.5,100,5,0,,21.5,3.9,IDL,0,,0,0,IDL;r=0;e=0\r\n",
+        "2026-11-20T00:00:00Z,2026-11-20 00:00:00,11,1,120,100,5,0,1,,5.02,TRK,1,A,0,1,TRK;r=1;p=A;e=0;s=1\r\n"
+        "2026-11-20T00:01:00Z,2026-11-20 00:01:00,12,2,120.5,100,5,0,,21.5,5.02,IDL,0,,0,0,IDL;r=0;e=0\r\n",
         encoding="utf-8")
     es = am.read_raw_csv(str(p))
     assert len(es) == 2

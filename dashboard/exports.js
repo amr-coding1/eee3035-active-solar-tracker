@@ -19,9 +19,9 @@ export function rawCsv(entries, fromDay, toDay) {
   return {
     filename: dmpName('raw', fromDay, toDay),
     header: ['created_at_utc', 'time_uk', 'entry_id', 'seq', 'p_trk_mw', 'p_fix_mw', 'p_use_mw', 'ang_panel_deg',
-      'ang_sun_deg', 'temp_c', 'vbat_v', 'state', 'run', 'panel', 'fault', 'sim', 'status'],
+      'ang_sun_deg', 'temp_c', 'v_supply_v', 'state', 'run', 'panel', 'fault', 'sim', 'status'],
     rows: entries.map((e) => [iso(e.t), fmtLondonIso(e.t), e.entryId ?? '', e.seq ?? '', csvNum(e.pTrk, 3), csvNum(e.pFix, 3),
-      csvNum(e.pUse, 3), csvNum(e.angPanel, 3), csvNum(e.angSun, 3), csvNum(e.temp, 3), csvNum(e.vbat, 3),
+      csvNum(e.pUse, 3), csvNum(e.angPanel, 3), csvNum(e.angSun, 3), csvNum(e.temp, 3), csvNum(e.vSupply, 3),
       e.state ?? '', e.run, e.panel ?? '', e.fault, e.sim ? 1 : 0, e.status ?? '']),
   };
 }

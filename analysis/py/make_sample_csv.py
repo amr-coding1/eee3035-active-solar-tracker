@@ -70,7 +70,7 @@ def main(argv):
         lines.append(",".join([
             utc.strftime("%Y-%m-%dT%H:%M:%SZ"), utc.astimezone(LONDON).strftime("%Y-%m-%d %H:%M:%S"),
             str(e["entry_id"]), str(e["seq"]), csv_num(e["p_trk"], 3), csv_num(e["p_fix"], 3), csv_num(e["p_use"], 3),
-            csv_num(e["ang_panel"], 3), csv_num(e["ang_sun"], 3), csv_num(e["temp"], 3), csv_num(e["vbat"], 3),
+            csv_num(e["ang_panel"], 3), csv_num(e["ang_sun"], 3), csv_num(e["temp"], 3), csv_num(e["v_supply"], 3),
             e["state"] or "", str(e["run"]), e["panel"] or "", str(e["fault"]), "1" if e["sim"] else "0",
             e["status"] or "",
         ]))

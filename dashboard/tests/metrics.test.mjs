@@ -18,7 +18,7 @@ function feed(minute, o = {}) {
     field1: o.p1 === undefined ? '600.0' : o.p1, field2: o.p2 === undefined ? '500.0' : o.p2,
     field3: o.p3 === undefined ? '100.0' : o.p3,
     field4: o.ap === undefined ? '10.0' : o.ap, field5: o.as === undefined ? '12.0' : o.as,
-    field6: '20.0', field7: '3.900', field8: o.seq === undefined ? String(minute + 1) : o.seq,
+    field6: '20.0', field7: '5.020', field8: o.seq === undefined ? String(minute + 1) : o.seq,
     status: o.status ?? `${o.state ?? 'TRK'};r=${o.run ?? 0};p=${o.panel ?? 'A'};e=${o.e ?? 0}${o.sim ? ';s=1' : ''}`,
   };
   return f;
