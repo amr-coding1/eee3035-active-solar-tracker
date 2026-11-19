@@ -1,9 +1,35 @@
 # Interface between the control system and the data link (contract 7.7)
 
-The data link owns: the three INA226 power sensors, the DS3231 clock, the flash
-buffer, Wi-Fi and the upload. The control system owns: sun-sensor arc, panel
-angle, motor, limit switches. The control system tells the data link what it
-is doing through a handful of functions; nothing else is shared.
+The data link owns: the three power sensors (INA226 or INA219), the DS3231
+clock, the flash buffer, Wi-Fi and the upload. The control system owns:
+sun-sensor arc, panel angle, servo. The control system tells the data link
+what it is doing through a handful of functions; nothing else is shared.
+
+## In the tracker firmware (19 Nov 2026): `transmission.h`
+
+`firmware/tracker/transmission.h` wraps everything below in one call, made by
+`control.cpp` every control cycle (5 Hz):
+
+```cpp
+#include "transmission.h"
+
+transmission::Report r;
+r.panel_deg = servo::angle();          // 0 = level, east negative, west positive
+r.sun_deg = sun_deg;                   // same convention
+r.sun_valid = sun_ok;                  // false: field5 omitted
+r.state = transmission::State::kTracking;   // kTracking, kHolding, kIdle, kStowed, kFault
+r.servo_moving = servo::moving();      // the minute shows MOV
+r.fault = 0;                           // 0, 5 sun-sensor arc, 7 travel limit, 8 servo stall/slip
+transmission::report(r);
+```
+
+It also offers `transmission::power()` (newest 1 Hz readings: P_trk, P_fix,
+P_use, V_supply), `transmission::status()` (time valid, Wi-Fi, records
+waiting, last upload, data-link fault), `transmission::log()`,
+`transmission::add_commands()` (extra serial commands such as `servo 30`) and
+`transmission::i2c_mutex()`. See `firmware/tracker/README.md`.
+
+## The functions underneath (data-link sketch, or your own sketch)
 
 ```cpp
 #include "src/core/ast_telemetry.h"   // from the sketch folder
@@ -26,8 +52,8 @@ void telemetry_set_panel(char panel_letter);   // optional, normally the CLI `pa
 |---|---|---|
 | `telemetry_set_angles` | every control cycle (at least once per second) | `panel_deg`: panel angle about the tracking axis in degrees, 0 = level, **east negative, west positive**. `sun_deg`: sun angle from the sensor arc on the same axis. `sun_valid = false` when the arc cannot see the sun (dark, cloud, sensor fault): field5 is then omitted. |
 | `telemetry_set_state` | every control cycle | `TRK` tracking, `HLD` holding (sensor uncertain), `IDL` idle (dark), `STW` stowed, `FLT` fault. `MOV` need not be sent: the data link reports `MOV` for every minute in which the motor ran. |
-| `telemetry_set_motor_running` | `true` when the motor starts, `false` when it stops | Latched: a burst shorter than a second is still seen. |
-| `telemetry_set_fault` | every control cycle with the current code | 0 none, 5 sun-sensor arc fault, 7 limit switch hit unexpectedly, 8 motor stall or timeout. A non-zero code wins over the data link's own codes; a code seen at any time in a minute is reported for that minute. |
+| `telemetry_set_motor_running` | `true` when the servo (motor) starts a move, `false` when it is switched off again | Latched: a burst shorter than a second is still seen. |
+| `telemetry_set_fault` | every control cycle with the current code | 0 none, 5 sun-sensor arc fault, 7 travel limit (angle command outside the safe range), 8 servo stall, overload or clutch slip. A non-zero code wins over the data link's own codes; a code seen at any time in a minute is reported for that minute. |
 | `telemetry_set_temperature` | when a panel temperature sensor is fitted | Otherwise field6 is omitted. |
 
 Rules:
@@ -36,8 +62,8 @@ Rules:
   functions take a mutex for a few microseconds).
 - If none of the first four functions is called for more than 5 s, the data
   link treats the control system as silent: angles unknown, state `IDL`.
-- Powers and battery voltage are NOT passed in: the data link reads the
-  INA226 itself. The power-system lead supplies the shunt values
+- Powers and the supply voltage are NOT passed in: the data link reads the
+  power sensors itself. The power-system lead supplies the shunt values
   (`cal <trk|fix|use> shunt <ohms>`).
 - I2C bus: the data link's tasks use `Wire` on A4/A5. Control code that also
   uses I2C must take the bus mutex around each transaction:

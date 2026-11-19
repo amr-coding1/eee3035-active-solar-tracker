@@ -21,6 +21,9 @@ struct Defaults {
   // I2C addresses of the power sensors (INA226 or INA219, found automatically):
   // tracked panel, fixed panel, tracker consumption (5 V feed).
   uint8_t ina_addr[3] = {0x40, 0x41, 0x44};
+  // Optional second consumption branch, added to P_use (e.g. the servo branch
+  // on its own channel of a four-channel INA219 board). 0 = not fitted.
+  uint8_t ina_addr_use2 = 0;
   const char* banner = "AST data link";   // first line printed at boot
 };
 

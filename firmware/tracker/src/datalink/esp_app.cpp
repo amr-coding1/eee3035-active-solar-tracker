@@ -167,6 +167,8 @@ SystemClock g_clock;
 SerialSink g_sink;
 Ds3231 g_rtc;
 InaSensor g_ina[3];
+InaSensor g_ina_use2;                // optional second consumption branch (0 = not fitted)
+bool g_use2 = false;
 ast::DataLink* g_dl = nullptr;
 CommandHook g_hook = nullptr;        // set before app_setup's tasks start; read by loop() only
 const char* g_hook_help = nullptr;
@@ -219,6 +221,25 @@ void read_sensors(ast::Sample1Hz* s) {
   s->p_fix_mw = r[1].power_mw;
   s->p_use_valid = ok[2];
   s->p_use_mw = r[2].power_mw;
+  if (g_use2) {
+    // Two supply branches (e.g. MCU and servo fed separately from the power
+    // bank, each through its own channel of a four-channel INA219 board):
+    // P_use is their sum, and unknown if either branch did not answer.
+    ast::InaReading r2;
+    bool ok2;
+    {
+      std::lock_guard<std::mutex> g(g_i2c_mu);
+      ok2 = g_ina_use2.read(&r2);
+    }
+    s->p_use_valid = ok[2] && ok2;
+    s->p_use_mw = r[2].power_mw + (ok2 ? r2.power_mw : 0.0f);
+    std::lock_guard<std::mutex> g(g_cfg_mu);
+    g_last_valid[2] = s->p_use_valid;
+    if (s->p_use_valid) {
+      g_last_reading[2].power_mw = s->p_use_mw;
+      g_last_reading[2].milliamps += r2.milliamps;   // both branches; volts stay those of the first
+    }
+  }
   // The consumption sensor sits in the 5 V feed to the tracker (19 Nov wiring
   // correction): its bus voltage is the supply rail, field7 V_supply.
   s->vsup_valid = ok[2];
@@ -555,6 +576,7 @@ void cmd_cal_show() {
 void apply_cal(int ch) {   // g_cfg_mu held by the caller
   std::lock_guard<std::mutex> g(g_i2c_mu);
   g_ina[ch].set_cal(g_settings.cal[ch]);
+  if (ch == 2 && g_use2) g_ina_use2.set_cal(g_settings.cal[2]);
 }
 
 void cmd_cal_point(const ast::Command& c) {
@@ -749,6 +771,7 @@ void print_i2c_scan() {
     for (int k = 0; k < 3; ++k) {
       if (found[i] == g_ina[k].address()) role = kInaRole[k];
     }
+    if (g_use2 && found[i] == g_ina_use2.address()) role = "use, 2nd branch";
     Serial.printf("  0x%02X %s%s%s\n", found[i], i2c_guess(found[i]), role[0] ? " -> configured as " : "", role);
   }
 }
@@ -807,6 +830,8 @@ void app_setup(const Defaults& d) {
   delay(300);
   Serial.printf("\n%s - EEE3035 Group 8 - contract %s\n", d.banner != nullptr ? d.banner : "AST data link", ast::kContractVersion);
   for (int i = 0; i < 3; ++i) g_ina[i].set_address(d.ina_addr[i]);
+  g_use2 = d.ina_addr_use2 != 0;
+  if (g_use2) g_ina_use2.set_address(d.ina_addr_use2);
 
   // Settings: secrets.h defaults first, NVS on top.
   g_settings.wifi_ssid = d.wifi_ssid ? d.wifi_ssid : "";
@@ -873,6 +898,16 @@ void app_setup(const Defaults& d) {
     }
     Serial.printf("power sensor %-15s 0x%02X: %s\n", kInaRole[i], g_ina[i].address(),
                   g_ina[i].ok() ? ast::ina_chip_name(g_ina[i].chip()) : "NOT FOUND (fault 1/2/3 until it answers)");
+  }
+  if (g_use2) {
+    g_ina_use2.set_cal(g_settings.cal[2]);   // shares the `use` calibration
+    ast::InaReading r;
+    {
+      std::lock_guard<std::mutex> g(g_i2c_mu);
+      g_ina_use2.read(&r);
+    }
+    Serial.printf("power sensor %-15s 0x%02X: %s (added to P_use)\n", "use, 2nd branch", g_ina_use2.address(),
+                  g_ina_use2.ok() ? ast::ina_chip_name(g_ina_use2.chip()) : "NOT FOUND (fault 3 until it answers)");
   }
 
   // Task watchdog: 180 s, panic (= reboot) on expiry (contract 7.4).

@@ -100,6 +100,7 @@ ul.plain { margin: 0; padding-left: 1.2rem; display: grid; gap: 6px; }
     <div class="chips" aria-label="State on 13 Nov 2026">
       <span class="chip pass">Cloud side live</span>
       <span class="chip pass">129 of 129 end-to-end checks</span>
+      <span class="chip pass">Tracker firmware: 211 PC tests, compiles clean</span>
       <span class="chip wait">Waiting for hardware</span>
       <span class="chip risk">Net-gain definition to agree</span>
     </div>
@@ -108,7 +109,7 @@ ul.plain { margin: 0; padding-left: 1.2rem; display: grid; gap: 6px; }
   <section aria-labelledby="how">
     <h2 id="how">How it works</h2>
     <ol class="flow">
-      <li><strong>Measure</strong><span class="what">3× INA226: tracked panel, fixed panel, tracker's own use. Angles and state from the control system. Once a second.</span></li>
+      <li><strong>Measure</strong><span class="what">Three power sensors (INA226 or INA219, found automatically): tracked panel, fixed panel, tracker's own use on the 5 V feed. Angles and state from the control code. Once a second.</span></li>
       <li><strong>Log</strong><span class="what">Arduino Nano ESP32 averages each UTC minute and keeps 8 days in flash, so Wi-Fi drops lose nothing.</span></li>
       <li><strong>Upload</strong><span class="what">HTTPS bulk upload to ThingSpeak channel <a href="https://thingspeak.mathworks.com/channels/3578277">3578277</a> every 15 min.</span></li>
       <li><strong>Analyse</strong><span class="what">MATLAB on ThingSpeak, 00:20 UTC nightly: energy, gross and net gain, pointing error, completeness into channel <a href="https://thingspeak.mathworks.com/channels/3578278">3578278</a>.</span></li>
@@ -122,9 +123,10 @@ ul.plain { margin: 0; padding-left: 1.2rem; display: grid; gap: 6px; }
       <table class="stack">
         <thead><tr><th scope="col">Subsystem</th><th scope="col">What the data link needs</th><th scope="col">Where</th></tr></thead>
         <tbody>
-          <tr><td>Control system</td><td>Call <code>telemetry_set_angles</code>, <code>telemetry_set_state</code>, <code>telemetry_set_motor_running</code> and <code>telemetry_set_fault</code> once a second. Everything else (powers, clock, storage, upload) is already handled.</td><td><a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/blob/main/firmware/INTERFACE.md">INTERFACE.md</a></td></tr>
-          <tr><td>Power system</td><td>The three shunt values (default 0.1 Ω), all modules on 3V3 (no Nano ESP32 pin takes 5 V), INA226 at I2C 0x40 tracked, 0x41 fixed, 0x44 battery line.</td><td><a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/blob/main/firmware/README.md#wiring">Wiring</a></td></tr>
-          <tr><td>Sun sensing</td><td>Sun angle on the tracking axis (east negative, west positive), passed through the control system.</td><td><a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/blob/main/firmware/INTERFACE.md">INTERFACE.md</a></td></tr>
+          <tr><td>Control system</td><td>Tracker firmware (19 Nov): <code>control.cpp</code> runs five times a second and calls <code>transmission::report()</code> with the panel angle, sun angle, state, servo moving and fault. Powers, clock, storage and upload are handled by <code>transmission</code>. Starter code is in place for CO to check and tune.</td><td><a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/blob/main/firmware/tracker/README.md">tracker/README.md</a></td></tr>
+          <tr><td>Actuators</td><td>DS-R001 servo: signal on D9 (330 Ω), power switched by a MOSFET on D8 so it draws nothing between moves. Trim and direction from the inclinometer check (<code>servo test</code>); holding test unpowered.</td><td><a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/blob/main/firmware/tracker/README.md#servo-power-switch">Servo switch</a></td></tr>
+          <tr><td>Power system</td><td>Shunt values (default 0.1 Ω), all modules on 3V3 (no Nano ESP32 pin takes 5 V). INA226 or INA219 at I2C 0x40 tracked, 0x41 fixed, 0x44 on the 5 V feed (P_use and V_supply); addresses in <code>config.h</code>.</td><td><a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/blob/main/firmware/tracker/README.md#wiring">Wiring</a></td></tr>
+          <tr><td>Sun sensing</td><td>Four BPX65 on A0–A3, powered from 3V3. <code>sensing.cpp</code> estimates the light direction (east negative); calibrate with <code>sun cal dark</code> and <code>sun cal flat</code>.</td><td><a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/blob/main/firmware/tracker/README.md">tracker/README.md</a></td></tr>
           <tr><td>Mechanical and testing</td><td>Fixed panel at the tracker's tilt. Before a test type <code>run 12</code> and <code>panel A</code> on the serial console; calibration runs are 900–999.</td><td><a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/blob/main/docs/VV_RESULTS.md">Bench procedures</a></td></tr>
           <tr><td>Report writers</td><td>V&amp;V tables, decision matrix, energy budget, DMP, FMEA, AI-log entry and figures, ready to cite.</td><td><a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/tree/main/docs">docs/</a> · <a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/tree/main/analysis/figures">figures</a></td></tr>
         </tbody>
@@ -135,14 +137,14 @@ ul.plain { margin: 0; padding-left: 1.2rem; display: grid; gap: 6px; }
   <section aria-labelledby="key">
     <h2 id="key">What the headline result depends on</h2>
     <div class="key">
-      <p><strong>In November, tracking gains about as much energy as the electronics use.</strong> PVGIS for Guildford with the 5.4 W panel: an inclined-axis tracker beats a fixed panel at the same tilt by about 1.5 Wh a day; a flat tracker beats a flat fixed panel by about 2.5 Wh. The data-link firmware is estimated at 2.3 Wh a day, and an ESP32 left awake uses about 4.8.</p>
-      <p><strong>Decided 17 Nov (Lem): <code>P_use</code> is everything the tracker draws</strong> (MCU with Wi-Fi, sensors, driver, motor). Over a year the PVGIS model gives +29 % gross and +14 % net of the data link, but a net loss from November to February (Nov &minus;10 %, Dec &minus;27 %, before the motor), so the lab runs will probably show a loss. Report gross and net month by month: <a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/blob/main/docs/figures/net_gain_by_month.png">figure</a> and <a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/blob/main/docs/energy/net_gain_by_month.md">table</a>. Light sleep between samples would keep every month positive.</p>
+      <p><strong>In November, tracking gains about as much energy as the electronics use.</strong> PVGIS for Guildford with the 5.4 W panel: an inclined-axis tracker beats a fixed panel at the same tilt by about 1.5 Wh a day; a flat tracker beats a flat fixed panel by about 2.5 Wh. The firmware as built (board awake, radio off between uploads, servo switched off between moves) is modelled at about 2.9 Wh a day, and an ESP32 left awake uses about 4.8. A servo left powered would add 1.2–4.8 Wh a day on its own, which is why it is switched off between moves.</p>
+      <p><strong>Decided 17 Nov (Lem): <code>P_use</code> is everything the tracker draws</strong> (MCU with Wi-Fi, sensors, servo). Over a year the PVGIS model gives +29 % gross and +14 % net of the data link, but a net loss in the winter months while the board stays awake, so the lab runs will probably show a loss. Report gross and net month by month: <a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/blob/main/docs/figures/net_gain_by_month.png">figure</a> and <a href="https://github.com/amr-coding1/eee3035-active-solar-tracker/blob/main/docs/energy/net_gain_by_month.md">table</a>. Light sleep between samples would keep every month positive.</p>
       <p>Still to confirm before the first outdoor run: the fixed reference panel sits at the tracker's tilt.</p>
     </div>
     <figure>
       <svg viewBox="0 0 420 290" role="img" aria-labelledby="chart-title chart-desc" class="chart">
         <title id="chart-title">November: tracking gain versus electronics use, Wh per day</title>
-        <desc id="chart-desc">Gain of an inclined-axis tracker over a fixed panel at the same tilt 1.46; gain of a flat tracker over a flat fixed panel 2.48; data-link firmware estimate 2.3; ESP32 left awake 4.8; light-sleep target 0.24.</desc>
+        <desc id="chart-desc">Gain of an inclined-axis tracker over a fixed panel at the same tilt 1.46; gain of a flat tracker over a flat fixed panel 2.48; firmware as built, modelled 2.87; ESP32 left awake 4.8; light sleep with 15-minute uploads, modelled 0.49.</desc>
         <g font-size="13">
           <g stroke="var(--rule)" stroke-width="1">
             <line x1="10" y1="26" x2="10" y2="262"/><line x1="86" y1="26" x2="86" y2="262"/><line x1="162" y1="26" x2="162" y2="262"/>
@@ -157,18 +159,18 @@ ul.plain { margin: 0; padding-left: 1.2rem; display: grid; gap: 6px; }
           <text x="10" y="72" fill="var(--ink)">Gain: flat tracker vs flat fixed panel</text>
           <rect x="10" y="80" width="188.8" height="20" rx="3" fill="var(--gain)"/>
           <text x="204.8" y="95" fill="var(--ink)">2.48</text>
-          <text x="10" y="124" fill="var(--ink)">Use: data-link firmware (estimate)</text>
-          <rect x="10" y="132" width="174.8" height="20" rx="3" fill="var(--use)"/>
-          <text x="190.8" y="147" fill="var(--ink)">≈ 2.3</text>
+          <text x="10" y="124" fill="var(--ink)">Use: firmware as built (model)</text>
+          <rect x="10" y="132" width="218.1" height="20" rx="3" fill="var(--use)"/>
+          <text x="234.1" y="147" fill="var(--ink)">2.87</text>
           <text x="10" y="176" fill="var(--ink)">Use: ESP32 left awake</text>
           <rect x="10" y="184" width="364.8" height="20" rx="3" fill="var(--use)"/>
           <text x="368.8" y="199" text-anchor="end" fill="var(--sheet)">4.8</text>
-          <text x="10" y="228" fill="var(--ink)">Use: light-sleep target</text>
-          <rect x="10" y="236" width="18.1" height="20" rx="3" fill="var(--use)"/>
-          <text x="34.1" y="251" fill="var(--ink)">0.24</text>
+          <text x="10" y="228" fill="var(--ink)">Use: light sleep, 15-min uploads (model)</text>
+          <rect x="10" y="236" width="37.2" height="20" rx="3" fill="var(--use)"/>
+          <text x="53.2" y="251" fill="var(--ink)">0.49</text>
         </g>
       </svg>
-      <figcaption>Wh per day. Gains: PVGIS 5.3, Guildford (51.243 N, 0.589 W), 5.4 W panel, 14 % system loss, November daily mean. Uses: firmware energy budget from datasheet currents, not yet measured; the INA226 on the battery line will measure the real figure.</figcaption>
+      <figcaption>Wh per day. Gains: PVGIS 5.3, Guildford (51.243 N, 0.589 W), 5.4 W panel, 14 % system loss, November daily mean. Uses: bottom-up power budget of 19 Nov (docs/energy/power_budget.md), datasheet and listing currents, not yet measured; the consumption sensor on the 5 V feed will measure the real figure.</figcaption>
     </figure>
   </section>
 

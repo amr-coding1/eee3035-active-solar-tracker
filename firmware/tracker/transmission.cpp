@@ -71,6 +71,7 @@ void begin() {
   d.ina_addr[0] = cfg::kInaTracked;
   d.ina_addr[1] = cfg::kInaFixed;
   d.ina_addr[2] = cfg::kInaUse;
+  d.ina_addr_use2 = cfg::kInaUse2;
   d.banner = "AST tracker firmware (sensing, control, servo, data link)";
   ast_esp::app_set_command_hook(dispatch, g_help.c_str());
   ast_esp::app_setup(d);

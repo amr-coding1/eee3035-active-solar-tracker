@@ -235,10 +235,12 @@ simulated sample carries `s=1`. Never mixed silently with real data.
 `power`, `wifi <ssid> <pass>`, `keys <ch1> <write> [read]`, `reboot`.
 
 ### 7.7 Interface to the rest of the firmware
-See `firmware/INTERFACE.md`: the control system calls
-`ast::telemetry_set_angles()`, `ast::telemetry_set_state()`, etc. once per
-second; the data link owns the power-sensor reads (INA226 or INA219, auto-detected;
-the power system lead supplies the shunt values) and everything after that.
+See `firmware/INTERFACE.md`: in the tracker firmware (`firmware/tracker`) the
+control code calls `transmission::report()` every control cycle (5 Hz), which
+calls `ast::telemetry_set_angles()`, `ast::telemetry_set_state()`, etc.; at
+least once per second is required. The data link owns the power-sensor reads
+(INA226 or INA219, auto-detected; the power system lead supplies the shunt
+values) and everything after that.
 
 ## 8. Read API (dashboard and MATLAB)
 

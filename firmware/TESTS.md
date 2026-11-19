@@ -1,5 +1,35 @@
 # Firmware tests and results
 
+## Update, 19 Nov 2026: tracker firmware (sensing, servo, control, transmission)
+
+Run on 19 Nov 2026 (UTC) on the build machine: Ubuntu 24.04, g++ 13.3.0,
+CMake 3.28.3, arduino-cli 1.6.0, cores `esp32:esp32` 3.3.12 and 4.0.0.
+
+| Check | Result |
+|---|---|
+| Unit tests `host/build/ast_tests` (ASan + UBSan, `-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Werror`) | **211 tests, 0 failed** (195 data-link tests as before + 16 new) |
+| New: INA219 conversion and chip identification (INA226 / INA219 / INA3221 refused / nothing) | pass |
+| New: sun estimate from four photodiodes: exact model -65..+65 deg; 1 % gain mismatch + 5 mV noise over 50 random arcs: mean error < 1 deg, worst < 5 deg; one clipped channel tolerated; two clipped refused with the reason; dark; out of view; NaN | pass |
+| New: DS-R001 pulse map (500-2500 us, level = 1500 us, +/-50 deg clamp, trim, direction flip), LEDC duty (14-bit, 50 Hz); move sequence power-up at the old angle, 30 deg/s ramp, settle, power off; retarget; emergency stop; no-switch mode | pass |
+| New: tracking decisions: 5 deg deadband, +/-45 deg range, 10 s move gap, stow after darkness lasts, hold when the light has no direction, faults stop moves, manual and hold modes; stall guard | pass |
+| New: closed-loop digital twin: lamp sweeps -60..+60 deg at 1 deg/min, 1 % sensor mismatch, through estimate -> decisions -> servo -> telemetry -> minute aggregator -> channel-1 JSON. Pointing error mean < 4 deg, worst < 8 deg; 15-35 moves; servo powered < 60 s in 2 h; MOV, IDL, STW minutes; stowed at -45 deg in the dark; tracked energy 12-30 % above fixed for this sweep; a jammed servo trips the stall guard in 2.5-4 s and is switched off | pass |
+| Concurrency test (TSan), `ast_host_device --selftest`, `smoke_mock.sh` | pass, as before |
+| ESP32 compile, core 3.3.12, both sketches (`build.sh esp32`) | **0 errors, 0 warnings in our files**; tracker 1,310,197 bytes (41 %), data link 1,282,421 bytes (40 %) |
+| ESP32 compile, core 4.0.0 (the version the Boards Manager installs today), tracker | **0 errors, 0 warnings** (whole log); 1,382,350 bytes (43 %) |
+| `sync_core.sh --check` (core and adapter copies in both sketches) | identical |
+| End-to-end suite `tests/e2e/run_e2e.py` with the new core (host firmware, mock ThingSpeak, real dashboard in Chrome, Python nightly stand-in because Octave is not installed) | **129 of 129 PASS**; the committed results files (13 Nov, real Octave) were kept |
+| Dashboard unit 32/32, browser 9/9; Python 41 + 69 pytest | pass |
+
+Not covered by any automatic test (needs the real board): photodiode ADC
+readings and their real angular response, servo PWM and power switch, the
+INA219 and INA226 I2C drivers, Wi-Fi + TLS, DS3231, LittleFS, NVS, watchdog,
+measured current. The bench runbook (`docs/BENCH_RUNBOOK_26NOV.md`, W1-W8 and
+S1-S7) covers them on 25-26 Nov.
+
+---
+
+## Data link, 13 Nov 2026
+
 Run on 13 Nov 2026 (UTC) on the build machine: Ubuntu 24.04, g++ 13.3.0,
 CMake 3.28.3, arduino-cli 1.6.0, core `esp32:esp32` 3.3.12.
 Reproduce with `firmware/build.sh` (everything) or `firmware/build.sh host`.

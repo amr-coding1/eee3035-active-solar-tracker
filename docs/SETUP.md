@@ -45,7 +45,7 @@ for the presentation); `...?day=2026-11-12` opens a given UTC day.
 ## 3. When the hardware arrives (bench, AM with the control and power leads)
 
 Full guide: `firmware/README.md` ("Wiring", "Build and flash", "Wi-Fi and keys",
-"Calibrating the INA226"). In short:
+"Calibrating the INA226"; the same commands work for an INA219). In short:
 
 ```
 arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
@@ -64,7 +64,7 @@ upload                                         send now; then check channel 3578
 ```
 
 Then the bench procedures B1-B4 in `docs/VV_RESULTS.md` (real Wi-Fi, TLS, RTC, sensors), the
-check of how ThingSpeak answers a repeated timestamp, and calibrate the three INA226 against
+check of how ThingSpeak answers a repeated timestamp, and calibrate the three power sensors (INA226 or INA219) against
 the bench DMM.
 
 Optional before the first real test: export the simulated data (dashboard > Export), then

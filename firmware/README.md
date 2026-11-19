@@ -1,17 +1,28 @@
-# AST data link firmware (EEE3035 Group 8, Active Solar Tracker)
+# AST firmware (EEE3035 Group 8, Active Solar Tracker)
 
-Owner: AM (data manager). Implements `docs/CONTRACT.md` v1.5, section 7: the
-device side of "timed data transmission to a known free secure location"
-(requirements F7, F8). Board: Arduino Nano ESP32 (ESP32-S3), core
-`esp32:esp32` 3.3.x.
+Two sketches share the same data link:
 
-**Status (13 Nov 2026): compiled for the board and tested on the PC only. It
-has not yet run on the real hardware** - see "Known limitations".
+- **`tracker/` - the whole tracker** (19 Nov 2026): `transmission` (the data
+  link below), `sensing` (photodiode arc), `servo` (DS-R001 with a power
+  switch) and `control` (tracking decisions), called from `main.cpp`. Opens in
+  the Arduino IDE and in VS Code with PlatformIO (`platformio.ini` here). Start
+  with [`tracker/README.md`](tracker/README.md): wiring, commands, first power-up.
+- **`ast_datalink/` - the data link on its own**, for bench tests of the
+  data path (B1-B4) and the 24 h energy run.
+
+This file documents the data link. Owner: AM (data manager). Implements
+`docs/CONTRACT.md` v1.5, section 7: the device side of "timed data
+transmission to a known free secure location" (requirements F7, F8). Board:
+Arduino Nano ESP32 (ESP32-S3), core `esp32:esp32` 3.3.x (tested 3.3.12).
+
+**Status (19 Nov 2026): both sketches compile with no warnings and the logic
+passes 211 PC tests, including a closed-loop digital twin of the tracker. Not
+yet run on the real hardware** - see "Known limitations".
 
 ## What it does
 
 ```
-3x INA226 + control-system telemetry --1 Hz--> minute aggregator --1/min--> ring buffer on LittleFS
+3 power sensors + control-system telemetry --1 Hz--> minute aggregator --1/min--> ring buffer on LittleFS
    (or the built-in simulator, s=1)                                          (11,520 records = 8 days)
                                                                                    |
 ThingSpeak channel 1  <-- HTTPS bulk_update, every 15 min at second 20 -- upload state machine
@@ -31,24 +42,27 @@ ThingSpeak channel 1  <-- HTTPS bulk_update, every 15 min at second 20 -- upload
 
 | Directory | Content |
 |---|---|
-| `core/` | portable C++17 (no Arduino headers): record codec, ring buffer, aggregator, status string, JSON builder, upload state machine, time validity, simulator, CLI parser, calibration maths, telemetry API, `DataLink` (ties it together) |
-| `ast_datalink/` | Arduino sketch: `ast_datalink.ino`, adapters in `src/esp_*.{h,cpp}` (LittleFS, Wi-Fi/TLS/HTTP, DS3231, INA226, NVS, tasks, CLI), `src/core/` = generated copy of `core/` |
-| `host/` | CMake build for the PC: 195 unit tests (ASan + UBSan), ThreadSanitizer test, `ast_host_device`, `smoke_mock.sh` |
-| `build.sh`, `sync_core.sh` | build + test everything; copy `core/` into the sketch |
+| `core/` | portable C++17 (no Arduino headers): record codec, ring buffer, aggregator, status string, JSON builder, upload state machine, time validity, simulator, CLI parser, calibration maths (INA226 and INA219), telemetry API, `DataLink`; and for the tracker: sun estimate (`ast_sun`), servo pulse map and move sequence (`ast_servo`), tracking decisions and stall guard (`ast_tracker`) |
+| `ast_datalink/` | data-link sketch: `ast_datalink.ino`, adapters in `src/esp_*.{h,cpp}` (LittleFS, Wi-Fi/TLS/HTTP, DS3231, INA226/INA219, NVS, tasks, CLI), `src/core/` = generated copy of `core/` |
+| `tracker/` | tracker sketch: `main.cpp`, `config.h`, `transmission`, `sensing`, `servo`, `control`; `src/datalink/` = generated copy of `core/` and the adapters |
+| `host/` | CMake build for the PC: 211 unit tests (ASan + UBSan) incl. the closed-loop twin, ThreadSanitizer test, `ast_host_device`, `smoke_mock.sh` |
+| `build.sh`, `sync_core.sh` | build + test everything; copy `core/` and the adapters into the sketches |
+| `platformio.ini` | VS Code + PlatformIO project for `tracker/` (pioarduino platform, core 3.3.12) |
 | `INTERFACE.md`, `TESTS.md` | API for the control-system code; test list and results |
 
 The ESP32 and the PC run the same `core/` sources; `build.sh` refuses to
-compile if the copy in the sketch differs.
+compile if a copy in a sketch differs.
 
 ## Wiring
 
 All modules are powered from the Nano ESP32 **3V3** pin, so every I2C line
-idles at 3.3 V. **No GPIO of the Nano ESP32 is 5 V tolerant.**
+idles at 3.3 V. **No GPIO of the Nano ESP32 is 5 V tolerant.** The tracker's
+photodiodes, servo and power switch are in [`tracker/README.md`](tracker/README.md#wiring).
 
 | Signal | Nano ESP32 pin | Goes to |
 |---|---|---|
-| SDA | A4 (GPIO11) | SDA of 3x INA226 and DS3231 |
-| SCL | A5 (GPIO12) | SCL of 3x INA226 and DS3231 |
+| SDA | A4 (GPIO11) | SDA of the power sensors and DS3231 |
+| SCL | A5 (GPIO12) | SCL of the power sensors and DS3231 |
 | 3V3 | 3V3 | VCC/VS of all four modules |
 | GND | GND | GND of all modules, common with panel and battery negative |
 
@@ -56,8 +70,16 @@ idles at 3.3 V. **No GPIO of the Nano ESP32 is 5 V tolerant.**
 |---|---|---|---|---|
 | 0x40 | INA226 #1 | A1 = GND, A0 = GND | TRACKED panel output | field1 `P_trk` |
 | 0x41 | INA226 #2 | A1 = GND, A0 = VS | FIXED panel output | field2 `P_fix` |
-| 0x44 | INA226 #3 | A1 = VS, A0 = GND | tracker consumption (battery line: MCU, sensors, driver, motor) | field3 `P_use`, field7 `V_bat` (bus voltage) |
+| 0x44 | INA226 #3 | A1 = VS, A0 = GND | tracker consumption on the **5 V feed** (MCU, sensors, servo) | field3 `P_use`, field7 `V_supply` (bus voltage) |
 | 0x68 | DS3231 | fixed | UTC clock with backup cell | timestamps |
+
+**INA226 or INA219.** Each address is identified at first contact (register
+0xFE "TI" = INA226; otherwise a reset that reads back 0x399F = INA219; an
+INA3221 is refused). A four-channel INA219 board usually answers at
+0x40-0x43: set the addresses in `tracker/config.h` (or `Defaults.ina_addr`).
+A second consumption branch (MCU and servo fed separately) can be added to
+P_use with `kInaUse2`. The INA219 averages over 68 ms instead of the INA226's
+1.05 s, so a servo burst shorter than about 0.1 s can be missed in P_use.
 
 Limits to respect:
 
@@ -81,9 +103,10 @@ Tested tool versions: arduino-cli 1.6.0, core `esp32:esp32` 3.3.12.
 ```
 arduino-cli core install esp32:esp32@3.3.12 \
   --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
-cp firmware/ast_datalink/secrets.example.h firmware/ast_datalink/secrets.h   # optional, see below
-firmware/build.sh esp32                 # compile only
-firmware/build.sh upload /dev/ttyACM0   # compile and flash (Windows: COM5)
+cp firmware/tracker/secrets.example.h firmware/tracker/secrets.h   # optional, see below
+firmware/build.sh esp32                          # compile both sketches
+firmware/build.sh upload /dev/ttyACM0            # compile and flash the tracker (Windows: COM5)
+firmware/build.sh upload-datalink /dev/ttyACM0   # the data link on its own
 ```
 
 FQBN: `esp32:esp32:nano_nora:PartitionScheme=spiffs` ("With SPIFFS partition
@@ -226,8 +249,8 @@ Details and results: `TESTS.md`.
    except `FLT`, which is kept (a faulted minute must not count as pointing).
    A control fault seen at any second of the minute is reported for that minute.
 6. **Partial minutes** (boot, restart) are logged from the samples available.
-   `V_bat` and `T_panel` are minute means (like the powers); `V_bat` is the
-   bus voltage of INA226 0x44.
+   `V_supply` and `T_panel` are minute means (like the powers); `V_supply` is
+   the bus voltage of the consumption sensor (0x44, 5 V feed).
 7. **Strictly increasing timestamps.** The newest logged minute is stored with
    the cursors; a record for a minute not later than it is refused (log line
    `skip`), after a clock correction or a reboot inside the same minute too.
@@ -271,8 +294,8 @@ Details and results: `TESTS.md`.
 ## Known limitations
 
 - Not yet run on the Nano ESP32: Wi-Fi/TLS against the real ThingSpeak, I2C
-  drivers, LittleFS timing, watchdog and current consumption are untested on
-  hardware. The PC tests cover the logic only.
+  drivers (INA226, INA219, DS3231), LittleFS timing, watchdog, servo PWM and
+  current consumption are untested on hardware. The PC tests cover the logic only.
 - The PC device (`ast_host_device`) speaks plain HTTP to the mock only.
 - No light sleep yet (see "Energy budget").
 - One-second samples are taken on the FreeRTOS tick, not locked to the RTC
@@ -283,6 +306,6 @@ Details and results: `TESTS.md`.
 
 Apply these before the 26 Nov bench session:
 
-- **INA226 #3 (0x44) goes in the 5 V feed to the tracker, not the battery line** (wiring table above, and step 1 of the energy follow-up). With the Solar Power Manager the battery line also carries the charging current, so P_use can't be separated from charging there. In the 5 V feed it sees only what the tracker draws: MCU, sensors, driver and motor. Its bus voltage (field7, `V_bat`) will then read the 5 V rail, not the battery.
+- **INA226 #3 (0x44) goes in the 5 V feed to the tracker, not the battery line** (wiring table above, and step 1 of the energy follow-up). With the Solar Power Manager the battery line also carries the charging current, so P_use can't be separated from charging there. In the 5 V feed it sees only what the tracker draws: MCU, sensors and servo. Its bus voltage (field7, renamed `V_supply` on 19 Nov) reads the 5 V rail, not the battery.
 - **Power the Nano ESP32 through its USB-C port.** VBUS is not a power input on this board, and VIN expects 6–21 V.
-- **The 2.3 Wh/day estimate is low.** It leaves out the converter loss, the power LED, the photodiode bias and the motor driver. With those the firmware as built comes to about 3.11 Wh/day (130 mW). See `docs/energy/power_budget.md`; bench steps are in `docs/BENCH_RUNBOOK_26NOV.md`.
+- **The 2.3 Wh/day estimate is low.** It leaves out the converter loss, the power LED and the photodiode bias. With those the firmware as built comes to about 2.87 Wh/day (120 mW; 3.11 before the servo replaced the motor driver on 19 Nov), with the servo switched off between moves. See `docs/energy/power_budget.md`; bench steps are in `docs/BENCH_RUNBOOK_26NOV.md`.

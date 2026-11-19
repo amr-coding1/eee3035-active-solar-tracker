@@ -1,4 +1,4 @@
-# Active Solar Tracker data link (EEE3035 Group 8)
+# Active Solar Tracker: firmware, data link and dashboard (EEE3035 Group 8)
 
 **Live dashboard: https://amr-coding1.github.io/eee3035-active-solar-tracker/dashboard/**
 · Project hub: https://amr-coding1.github.io/eee3035-active-solar-tracker/
@@ -10,8 +10,13 @@ night and shows it on a phone. It covers mandatory product specifications (c) ti
 to a known free secure location, (d) timed display and analysis on a portable device, and the
 V&V documentation for both (requirements F7, F8, F9; supports F10 and F11).
 
+**New, 19 Nov: the whole tracker firmware** is in [`firmware/tracker/`](firmware/tracker/README.md):
+`transmission` (this data link), `sensing` (photodiode arc), `servo` (DS-R001 with a power switch)
+and `control` (tracking decisions), called from `main.cpp`. It opens in the Arduino IDE and in VS
+Code with PlatformIO. Compiled and unit-tested on a PC; first hardware test on Wed 25 Nov.
+
 ```
-3x INA226 + control system --1/s--> Nano ESP32: 1-min average, 8-day flash buffer --HTTPS every 15 min--> ThingSpeak 3578277
+3 power sensors + control --1/s--> Nano ESP32: 1-min average, 8-day flash buffer --HTTPS every 15 min--> ThingSpeak 3578277
                                                                                                                 |
          phone dashboard  <---- reads both channels + embeds MATLAB charts ----  MATLAB nightly 00:20 UTC  -->  ThingSpeak 3578278
 ```
@@ -20,21 +25,23 @@ V&V documentation for both (requirements F7, F8, F9; supports F10 and F11).
 
 | Subsystem | What the data link needs | Where |
 |---|---|---|
-| Control system | Call `ast::telemetry_set_angles(panel, sun, valid)`, `telemetry_set_state(...)`, `telemetry_set_motor_running(...)` and `telemetry_set_fault(code)` once a second from `loop()` or a task. Powers, clock, storage and upload are already handled. | [`firmware/INTERFACE.md`](firmware/INTERFACE.md) |
-| Power system | Shunt values of the three INA226 (default 0.1 Ω; set with `cal <trk\|fix\|use> shunt <ohms>`). All modules on 3V3: no Nano ESP32 pin is 5 V tolerant. I2C 0x40 tracked, 0x41 fixed, 0x44 battery line. | [`firmware/README.md#wiring`](firmware/README.md#wiring) |
-| Sun sensing | Sun angle on the tracking axis (east negative, west positive), via the control system. | [`firmware/INTERFACE.md`](firmware/INTERFACE.md) |
+| Control system | `firmware/tracker/control.cpp` (starter code for CO) calls `transmission::report()` five times a second with panel angle, sun angle, state, servo moving and fault. Powers, clock, storage and upload are already handled. | [`firmware/tracker/README.md`](firmware/tracker/README.md), [`firmware/INTERFACE.md`](firmware/INTERFACE.md) |
+| Actuators | DS-R001 servo: signal D9 through 330 Ω, power switched by a MOSFET on D8 (off between moves). Trim and direction from `servo test` with the inclinometer. | [`firmware/tracker/README.md#servo-power-switch`](firmware/tracker/README.md#servo-power-switch) |
+| Power system | INA226 or INA219 (found automatically), default 0.1 Ω shunts (`cal <trk\|fix\|use> shunt <ohms>`). All modules on 3V3: no Nano ESP32 pin is 5 V tolerant. I2C 0x40 tracked, 0x41 fixed, 0x44 on the 5 V feed (P_use, V_supply); addresses in `config.h`. | [`firmware/tracker/README.md#wiring`](firmware/tracker/README.md#wiring) |
+| Sun sensing | Four BPX65 on A0-A3, powered from 3V3; `sensing.cpp` gives the light direction (east negative); `sun cal dark` / `sun cal flat`. | [`firmware/tracker/README.md`](firmware/tracker/README.md) |
 | Mechanical and testing | Fixed panel at the tracker's tilt. Before each test type `run <n>` and `panel A` on the serial console (115200 baud); calibration runs are 900-999. | [`docs/VV_RESULTS.md`](docs/VV_RESULTS.md) |
 | Report writers | V&V tables, decision matrix, energy budget, DMP v2, SMART objectives and FMEA, AI-log entry, figures. | [`docs/`](docs/), [`analysis/figures/`](analysis/figures/), [`docs/figures/`](docs/figures/) |
 
 ## What the headline result depends on
 
 PVGIS for Guildford, 5.4 W panel, November: tracking gains about 1.5 Wh/day (inclined axis vs a
-fixed panel at the same tilt) to 2.5 Wh/day (flat vs flat). The data-link firmware is estimated at
-2.3 Wh/day; an ESP32 left awake uses about 4.8 Wh/day.
+fixed panel at the same tilt) to 2.5 Wh/day (flat vs flat). The firmware as built (awake, radio
+off between uploads, servo switched off between moves) is modelled at 2.87 Wh/day; an ESP32 left
+awake uses about 4.8 Wh/day; a servo left powered adds 1.2-4.8 Wh/day on its own
+([`docs/energy/power_budget.md`](docs/energy/power_budget.md)).
 
-**Decided 17 Nov (Lem): `P_use` is everything the tracker draws** (MCU with Wi-Fi, sensors, driver,
-motor). Over a year that gives +29 % gross and +14 % net of the data link, but a net loss from
-November to February (Nov -10 %, Dec -27 %, before the motor), so the lab runs will probably show
+**Decided 17 Nov (Lem): `P_use` is everything the tracker draws** (MCU with Wi-Fi, sensors, servo).
+With the board awake that is a net loss in the winter months, so the lab runs will probably show
 a loss: report gross and net month by month. Light sleep between samples would keep every month
 positive. Still to confirm: the fixed reference panel sits at the tracker's tilt.
 Figures: [`docs/figures/net_gain_by_month.png`](docs/figures/net_gain_by_month.png),
@@ -54,7 +61,7 @@ Figures: [`docs/figures/net_gain_by_month.png`](docs/figures/net_gain_by_month.p
 
 | Folder | What | Tests |
 |---|---|---|
-| [`firmware/`](firmware/) | Nano ESP32 data-link firmware: portable C++17 core, Arduino sketch, PC host build | 195 unit tests (ASan/UBSan), TSan test, board compile with 0 warnings |
+| [`firmware/`](firmware/) | Nano ESP32 firmware: `tracker/` (whole tracker), `ast_datalink/` (data link only, bench tests), portable C++17 core, PC host build | 211 unit tests incl. a closed-loop twin (ASan/UBSan), TSan test, both sketches compile with 0 warnings |
 | [`analysis/`](analysis/) | ThingSpeak MATLAB: nightly job, 5 visualizations, report figures; Python reference of contract section 6 | 41 pytest; every `.m` run in GNU Octave against the reference |
 | [`dashboard/`](dashboard/) | phone web app (no build step, no keys) | 32 unit tests, 9 tests in real Chrome incl. axe-core accessibility |
 | [`tools/`](tools/) | mock ThingSpeak server, Python device simulator | 69 pytest |

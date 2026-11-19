@@ -21,8 +21,11 @@ constexpr int kPanelPotPin = -1;      // D7 (ADC1) if the 10 k pot is coupled to
 constexpr uint8_t kInaTracked = 0x40;   // tracked panel output
 constexpr uint8_t kInaFixed = 0x41;     // fixed panel output
 constexpr uint8_t kInaUse = 0x44;       // 5 V feed to the tracker: P_use and V_supply
+// If the MCU and the servo are fed as two separate branches, each through its
+// own sensor, put the second one here: P_use is then the sum. 0 = not used.
+constexpr uint8_t kInaUse2 = 0x00;
 // A four-channel INA219 board usually sits at 0x40-0x43: change these to match
-// what the boot-time I2C scan prints.
+// what the boot-time I2C scan prints (e.g. 0x40, 0x41, 0x42 and use2 0x43).
 
 // ---- photodiode arc (Solar Sensing) ----------------------------------------------
 constexpr float kSunSensorDeg[4] = {-45.0f, -15.0f, 15.0f, 45.0f};  // direction each photodiode faces
